@@ -1,0 +1,26 @@
+{
+  "name": "cleaning-go",
+  "private": true,
+  "packageManager": "pnpm@10.14.0",
+  "scripts": {
+    "dev:mobile": "pnpm --filter @cleaning-go/mobile start",
+    "dev:admin": "pnpm --filter @cleaning-go/admin dev",
+    "admin:create": "node scripts/create-admin.mjs",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r --if-present test",
+    "lint": "pnpm -r --if-present lint",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.53.0",
+    "postgres": "^3.4.7",
+    "prettier": "^3.6.2",
+    "typescript": "^5.8.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "@types/react": "19.0.10",
+      "@types/react-dom": "19.0.4"
+    }
+  }
+}
