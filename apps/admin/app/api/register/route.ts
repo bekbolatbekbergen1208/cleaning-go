@@ -65,6 +65,19 @@ export async function POST(request: NextRequest) {
       const duplicate = error.message.toLowerCase().includes('already') || error.message.toLowerCase().includes('registered');
       return NextResponse.json({ error: duplicate ? 'Этот email уже зарегистрирован.' : error.message }, { status: duplicate ? 409 : 400, headers });
     }
+    if (role === 'client' && body.referral_code) {
+      const code = String(body.referral_code).trim().toUpperCase();
+      const { data: company } = await admin.from('company_profiles').select('id,owner_id').eq('company_code', code).maybeSingle();
+      if (company) {
+        await admin.from('notifications').insert({
+          user_id: company.owner_id,
+          type: 'company_client',
+          title: 'Новый клиент в отделе продаж',
+          body: `${fullName} зарегистрировался по коду вашей компании`,
+          data: { company_id: company.id, client_id: data.user.id },
+        });
+      }
+    }
     return NextResponse.json({ userId: data.user.id }, { status: 201, headers });
   } catch {
     return NextResponse.json({ error: 'Не удалось обработать регистрацию.' }, { status: 500, headers });

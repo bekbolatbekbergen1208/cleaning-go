@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '../../lib/supabase/server';
 
 export default async function CompanyHome() {
@@ -23,8 +24,8 @@ export default async function CompanyHome() {
       <div><b className="block truncate px-2 text-lg">{company?.company_code ?? '—'}</b><span className="text-xs text-slate-500">код</span></div>
     </div>
     <div className="mt-5 grid gap-3 sm:grid-cols-2">
-      <section className="card"><p className="text-lg font-black">Заказы</p><p className="mt-1 text-sm text-slate-500">Новые заявки и текущие уборки компании.</p><button className="button mt-4 w-full">Открыть заказы</button></section>
-      <section className="card"><p className="text-lg font-black">Команда</p><p className="mt-1 text-sm text-slate-500">Клинеры, график и распределение работы.</p><button className="button mt-4 w-full">Управлять командой</button></section>
+      <section className="card"><p className="text-lg font-black">Отдел продаж</p><p className="mt-1 text-sm text-slate-500">Клиенты, зарегистрированные по коду компании.</p><Link href="/company/sales" className="button mt-4 w-full">Открыть клиентов</Link></section>
+      <section className="card"><p className="text-lg font-black">Заказы</p><p className="mt-1 text-sm text-slate-500">Новые заявки и текущие уборки компании.</p><span className="button mt-4 w-full opacity-60">Скоро</span></section>
     </div>
   </div>;
 }
