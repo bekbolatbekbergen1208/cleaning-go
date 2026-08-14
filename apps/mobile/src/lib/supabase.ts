@@ -14,6 +14,11 @@ const serverStorage = {
 const authStorage = Platform.OS === 'web' && typeof window === 'undefined' ? serverStorage : AsyncStorage;
 
 export const supabase = createClient(url, key, {
-  auth: { storage: authStorage, autoRefreshToken: typeof window !== 'undefined', persistSession: typeof window !== 'undefined', detectSessionInUrl: false },
+  auth: {
+    storage: authStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
 });
 if (Platform.OS !== 'web') AppState.addEventListener('change', (state) => state === 'active' ? supabase.auth.startAutoRefresh() : supabase.auth.stopAutoRefresh());

@@ -2,7 +2,8 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
-const publicPaths = new Set(['/', '/register', '/login', '/api/register']);
+const publicPaths = new Set(['/', '/register', '/login', '/admin/login', '/api/register']);
+const adminPaths = ['/admin', '/orders', '/verifications', '/users', '/services', '/moderation', '/settings'];
 
 export async function middleware(request: NextRequest) {
   if (publicPaths.has(request.nextUrl.pathname)) return NextResponse.next();
@@ -14,7 +15,10 @@ export async function middleware(request: NextRequest) {
     { cookies: { getAll: () => request.cookies.getAll(), setAll(items: CookieToSet[]) { items.forEach(({ name, value }) => request.cookies.set(name, value)); response = NextResponse.next({ request }); items.forEach(({ name, value, options }) => response.cookies.set(name, value, options)); } } },
   );
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.redirect(new URL('/login', request.url));
+  if (!user) {
+    const isAdminPath = adminPaths.some((path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(`${path}/`));
+    return NextResponse.redirect(new URL(isAdminPath ? '/admin/login' : '/login', request.url));
+  }
   return response;
 }
 

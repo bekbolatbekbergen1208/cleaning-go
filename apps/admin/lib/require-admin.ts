@@ -5,7 +5,7 @@ export async function requireAdmin() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) redirect('/login');
+  if (!user) redirect('/admin/login');
 
   const ownerEmail = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
   const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single();

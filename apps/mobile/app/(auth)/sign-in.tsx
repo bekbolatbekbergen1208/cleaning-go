@@ -14,6 +14,17 @@ function loginError(message: string) {
   return message;
 }
 
+const LOGIN_TIMEOUT_MS = 15_000;
+
+async function signInWithTimeout(email: string, password: string) {
+  return Promise.race([
+    supabase.auth.signInWithPassword({ email, password }),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Сервер не ответил вовремя. Проверьте интернет и попробуйте снова.')), LOGIN_TIMEOUT_MS),
+    ),
+  ]);
+}
+
 export default function SignIn() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -30,23 +41,29 @@ export default function SignIn() {
 
     setBusy(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+      const { data, error } = await signInWithTimeout(email.trim().toLowerCase(), password);
       if (error) {
-        setFeedback({ kind: 'error', title: 'Не удалось войти', body: loginError(error.message) });
+        const next = { kind: 'error' as const, title: 'Не удалось войти', body: loginError(error.message) };
+        setFeedback(next);
+        Alert.alert(next.title, next.body);
         return;
       }
       if (!data.session) {
-        setFeedback({ kind: 'error', title: 'Не удалось войти', body: 'Сессия не создана. Попробуйте ещё раз.' });
+        const next = { kind: 'error' as const, title: 'Не удалось войти', body: 'Сессия не создана. Попробуйте ещё раз.' };
+        setFeedback(next);
+        Alert.alert(next.title, next.body);
         return;
       }
       setFeedback({ kind: 'success', title: 'Вход выполнен', body: 'Открываем ваш кабинет…' });
       router.replace('/(tabs)');
     } catch (error) {
-      setFeedback({
+      const next = {
         kind: 'error',
         title: 'Нет соединения с сервером',
         body: error instanceof Error ? error.message : 'Попробуйте ещё раз через несколько секунд.',
-      });
+      } as const;
+      setFeedback(next);
+      Alert.alert(next.title, next.body);
     } finally {
       setBusy(false);
     }
