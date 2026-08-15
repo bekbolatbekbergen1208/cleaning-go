@@ -16,6 +16,6 @@ export function SiteHeader() {
     <Link href="/" className={pathname === '/' ? 'active' : ''}><span>⌂</span><small>Главная</small></Link>
     <Link href="/#services"><span>✦</span><small>Услуги</small></Link>
     <Link href="/company" className={pathname.startsWith('/company') ? 'active' : ''}><span>▣</span><small>Компания</small></Link>
-    <Link href="/login" className={pathname === '/login' ? 'active' : ''}><span>◎</span><small>Профиль</small></Link>
+    <Link href="/profile" className={pathname === '/profile' || pathname === '/login' ? 'active' : ''}><span>◎</span><small>Профиль</small></Link>
   </nav>}</>;
 }
