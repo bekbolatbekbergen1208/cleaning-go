@@ -25,7 +25,7 @@ export default async function ProfilePage() {
   const [{ data: wallet }, { data: bonuses }, { data: orders }, { data: referral }] = await Promise.all([
     supabase.from('wallets').select('available_minor,pending_minor,currency').eq('owner_id', user.id).maybeSingle(),
     supabase.from('company_bonus_balances').select('balance_minor').eq('client_id', user.id),
-    supabase.from('orders').select('id,order_number,status,scheduled_at,total_minor').eq('client_id', user.id).order('created_at', { ascending: false }).limit(3),
+    supabase.from('orders').select('id,order_number,status,scheduled_at,total_minor,reviews(id)').eq('client_id', user.id).order('created_at', { ascending: false }).limit(3),
     supabase.from('referral_codes').select('code').eq('owner_id', user.id).maybeSingle(),
   ]);
   const companyBonusMinor = (bonuses ?? []).reduce((sum, item) => sum + Number(item.balance_minor), 0);
@@ -60,6 +60,8 @@ export default async function ProfilePage() {
         <div className="mt-3 space-y-2">{orders?.length ? orders.map((order) => <div className="rounded-2xl border border-slate-200 p-4" key={order.id}>
           <div className="flex items-center justify-between gap-3"><b>{order.order_number}</b><span className="text-xs font-semibold text-emerald-700">{order.status}</span></div>
           <p className="mt-1 text-xs text-slate-500">{new Date(order.scheduled_at).toLocaleString('ru-RU')} · {money(order.total_minor)}</p>
+          {order.status === 'completed' && !order.reviews?.length && <Link className="mt-3 inline-flex text-sm font-bold text-emerald-700" href={`/order/${order.id}/review`}>Оценить уборку →</Link>}
+          {order.reviews?.length ? <p className="mt-2 text-xs font-semibold text-emerald-700">Отзыв опубликован</p> : null}
         </div>) : <p className="text-sm text-slate-500">Заказов пока нет.</p>}</div>
       </div>}
       <form action={signOut} className="mt-8">

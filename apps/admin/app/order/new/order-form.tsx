@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { createClient } from '../../../lib/supabase/client';
 
 type Service = { id: string; name: string; description: string | null };
-type Company = { id: string; name: string; rating: number; reviews_count: number };
+type Company = { id: string; name: string; rating: number; reviews_count: number; service_cities: string[] };
 
 export function OrderForm({ services, companies, preferredCompanyId, companyLocked }: {
   services: Service[];
@@ -17,7 +17,12 @@ export function OrderForm({ services, companies, preferredCompanyId, companyLock
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [city, setCity] = useState('Актау');
   const [companyId, setCompanyId] = useState(preferredCompanyId ?? companies[0]?.id ?? '');
+  const availableCompanies = companyLocked
+    ? companies.filter((company) => company.id === preferredCompanyId)
+    : companies.filter((company) => company.service_cities.some((item) => item.trim().toLowerCase() === city.trim().toLowerCase()));
+  const selectedCompanyId = availableCompanies.some((company) => company.id === companyId) ? companyId : availableCompanies[0]?.id ?? '';
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,7 +54,7 @@ export function OrderForm({ services, companies, preferredCompanyId, companyLock
     const { data: order, error: orderError } = await supabase.rpc('create_order', { payload: {
       address_id: address.id,
       service_id: String(form.get('service_id')),
-      selected_company_id: companyId,
+      selected_company_id: selectedCompanyId,
       scheduled_at: scheduledAt.toISOString(),
       area_sq_m: Number(form.get('area_sq_m')),
       rooms_count: Number(form.get('rooms_count')),
@@ -67,8 +72,8 @@ export function OrderForm({ services, companies, preferredCompanyId, companyLock
 
   return <form className="card mt-6 space-y-4" onSubmit={submit}>
     <label className="block"><span className="text-sm font-semibold">Вид уборки</span><select className="input mt-1" name="service_id" required>{services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
-    <label className="block"><span className="text-sm font-semibold">Компания</span><select className="input mt-1" value={companyId} onChange={(event) => setCompanyId(event.target.value)} disabled={companyLocked} required>{companies.map((company) => <option key={company.id} value={company.id}>{company.name} · ★ {Number(company.rating).toFixed(1)}</option>)}</select>{companyLocked && <small className="mt-1 block text-slate-500">Компания закреплена вашим кодом.</small>}</label>
-    <div className="grid gap-4 sm:grid-cols-2"><label><span className="text-sm font-semibold">Город</span><input className="input mt-1" name="city" defaultValue="Актау" required /></label><label><span className="text-sm font-semibold">Адрес</span><input className="input mt-1" name="address" required /></label></div>
+    <div className="grid gap-4 sm:grid-cols-2"><label><span className="text-sm font-semibold">Город</span><input className="input mt-1" name="city" value={city} onChange={(event) => setCity(event.target.value)} required /></label><label><span className="text-sm font-semibold">Адрес</span><input className="input mt-1" name="address" required /></label></div>
+    <label className="block"><span className="text-sm font-semibold">Компания</span><select className="input mt-1" value={selectedCompanyId} onChange={(event) => setCompanyId(event.target.value)} disabled={companyLocked} required>{availableCompanies.map((company) => <option key={company.id} value={company.id}>{company.name} · ★ {Number(company.rating).toFixed(1)} · {company.reviews_count} отзывов</option>)}</select>{companyLocked ? <small className="mt-1 block text-slate-500">Компания закреплена вашим специальным кодом. Все заказы отправляются только ей.</small> : <small className="mt-1 block text-slate-500">Показаны проверенные компании, которые работают в городе «{city}».</small>}{!availableCompanies.length && <small className="mt-2 block font-semibold text-red-600">В этом городе пока нет доступных компаний.</small>}</label>
     <label className="block"><span className="text-sm font-semibold">Дата и время</span><input className="input mt-1" type="datetime-local" name="scheduled_at" required /></label>
     <div className="grid grid-cols-2 gap-4"><label><span className="text-sm font-semibold">Площадь, м²</span><input className="input mt-1" type="number" name="area_sq_m" min="1" defaultValue="50" required /></label><label><span className="text-sm font-semibold">Комнат</span><input className="input mt-1" type="number" name="rooms_count" min="1" defaultValue="2" required /></label></div>
     <label className="block"><span className="text-sm font-semibold">Фото помещения</span><input className="input mt-1" type="file" name="photo" accept="image/jpeg,image/png,image/webp" required /></label>
@@ -76,6 +81,6 @@ export function OrderForm({ services, companies, preferredCompanyId, companyLock
     <p className="text-sm text-slate-500">Оплата наличными. Итоговую цену компания подтвердит после просмотра фотографии.</p>
     {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
     {success && <p className="text-sm font-semibold text-emerald-700">{success}</p>}
-    <button className="button w-full" disabled={busy || !services.length || !companies.length}>{busy ? 'Создаём заказ…' : 'Отправить заказ'}</button>
+    <button className="button w-full" disabled={busy || !services.length || !availableCompanies.length}>{busy ? 'Создаём заказ…' : 'Отправить заказ'}</button>
   </form>;
 }
