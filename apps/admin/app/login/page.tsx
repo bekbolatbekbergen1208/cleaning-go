@@ -28,13 +28,17 @@ export default function Login() {
     }
 
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single();
-    if (profile?.role === 'admin') {
+    if (!profile?.role) {
       await supabase.auth.signOut();
-      setError('Для администратора используется отдельная страница входа.');
+      setError('Профиль аккаунта не найден. Обратитесь в поддержку.');
       setLoading(false);
       return;
     }
-    const destination = profile?.role === 'company_owner' ? '/company' : '/';
+    const destination = profile.role === 'admin'
+      ? '/admin'
+      : profile.role === 'company_owner'
+        ? '/company'
+        : '/profile';
     router.replace(destination);
     router.refresh();
   }
