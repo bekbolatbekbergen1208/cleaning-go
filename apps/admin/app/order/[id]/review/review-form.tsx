@@ -27,7 +27,7 @@ export function ReviewForm({ orderId }: { orderId: string }) {
   }
 
   return <form className="card mt-6 space-y-5" onSubmit={submit}>
-    <div><p className="text-sm font-semibold">Оценка</p><div className="mt-3 grid grid-cols-5 gap-2">{[1, 2, 3, 4, 5].map((value) => <button className={rating === value ? 'button' : 'rounded-xl border border-slate-200 px-3 py-3 font-black'} key={value} onClick={() => setRating(value)} type="button">{value} ★</button>)}</div></div>
+    <div><p className="text-sm font-semibold">Оценка клинеру и компании</p><p className="mt-1 text-xs text-slate-500">Оценка попадёт в средний рейтинг клинера и выполнившей заказ компании.</p><div className="mt-3 grid grid-cols-5 gap-2">{[1, 2, 3, 4, 5].map((value) => <button className={rating === value ? 'button' : 'rounded-xl border border-slate-200 px-3 py-3 font-black'} key={value} onClick={() => setRating(value)} type="button">{value} ★</button>)}</div></div>
     <label className="block"><span className="text-sm font-semibold">Комментарий</span><textarea className="input mt-1" rows={4} value={text} onChange={(event) => setText(event.target.value)} placeholder="Расскажите о качестве уборки" /></label>
     {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
     <button className="button w-full" disabled={busy}>{busy ? 'Публикуем…' : 'Опубликовать отзыв'}</button>
