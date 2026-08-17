@@ -19,7 +19,7 @@ export default function RegisterPage() {
     const password = String(body.password);
     const { error: loginError } = await createClient().auth.signInWithPassword({ email, password });
     if (loginError) { setError('Аккаунт создан, но войти автоматически не удалось. Войдите со страницы входа.'); setLoading(false); return; }
-    router.replace(body.role === 'company_owner' ? '/company' : '/');
+    router.replace(body.role === 'company_owner' ? '/company' : '/profile');
     router.refresh();
   }
 
