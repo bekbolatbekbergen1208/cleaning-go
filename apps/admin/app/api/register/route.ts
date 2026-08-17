@@ -43,6 +43,20 @@ export async function POST(request: NextRequest) {
     }
 
     const admin = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { data: existingProfiles, error: profileLookupError } = await admin
+      .from('profiles')
+      .select('email,phone')
+      .or(`email.ilike.${email},phone.eq.${phone}`)
+      .limit(1);
+    if (profileLookupError) return NextResponse.json({ error: 'Не удалось проверить регистрационные данные.' }, { status: 503, headers });
+    if (existingProfiles?.some((item) => item.email?.toLowerCase() === email)) return NextResponse.json({ error: 'Этот email уже зарегистрирован.' }, { status: 409, headers });
+    if (existingProfiles?.some((item) => item.phone === phone)) return NextResponse.json({ error: 'Этот номер телефона уже зарегистрирован.' }, { status: 409, headers });
+    if (role === 'company_owner') {
+      const registrationNumber = String(body.company_registration_number).trim();
+      const { data: existingCompany, error: companyLookupError } = await admin.from('company_profiles').select('id').eq('registration_number', registrationNumber).maybeSingle();
+      if (companyLookupError) return NextResponse.json({ error: 'Не удалось проверить БИН компании.' }, { status: 503, headers });
+      if (existingCompany) return NextResponse.json({ error: 'Компания с таким БИН уже зарегистрирована.' }, { status: 409, headers });
+    }
     const { data, error } = await admin.auth.admin.createUser({
       email,
       phone,
@@ -62,8 +76,8 @@ export async function POST(request: NextRequest) {
       },
     });
     if (error) {
-      const duplicate = error.message.toLowerCase().includes('already') || error.message.toLowerCase().includes('registered');
-      return NextResponse.json({ error: duplicate ? 'Этот email уже зарегистрирован.' : error.message }, { status: duplicate ? 409 : 400, headers });
+      console.error('Registration failed:', { code: error.code, status: error.status, message: error.message });
+      return NextResponse.json({ error: `Supabase отклонил регистрацию: ${error.message}` }, { status: error.status === 422 ? 409 : 400, headers });
     }
     if (role === 'client' && body.referral_code) {
       const code = String(body.referral_code).trim().toUpperCase();
