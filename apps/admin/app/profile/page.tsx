@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '../../lib/supabase/server';
+import { InvitationCard } from './invitation-card';
 
 const roleNames: Record<string, string> = {
   client: 'Клиент',
@@ -22,11 +23,13 @@ export default async function ProfilePage() {
   if (profile?.role === 'admin') redirect('/admin');
   if (profile?.role === 'company_owner') redirect('/company');
 
-  const [{ data: wallet }, { data: bonuses }, { data: orders }, { data: referral }] = await Promise.all([
+  const [{ data: wallet }, { data: bonuses }, { data: ledger }, { data: orders }, { data: referral }, { data: clientProfile }] = await Promise.all([
     supabase.from('wallets').select('available_minor,pending_minor,currency').eq('owner_id', user.id).maybeSingle(),
-    supabase.from('company_bonus_balances').select('balance_minor').eq('client_id', user.id),
+    supabase.from('company_bonus_balances').select('company_id,balance_minor,company_profiles(name)').eq('client_id', user.id),
+    supabase.from('company_bonus_ledger').select('id,operation,amount_minor,description,created_at,company_profiles(name)').eq('client_id', user.id).order('created_at', { ascending: false }).limit(10),
     supabase.from('orders').select('id,order_number,status,scheduled_at,total_minor,reviews(id)').eq('client_id', user.id).order('created_at', { ascending: false }).limit(3),
     supabase.from('referral_codes').select('code').eq('owner_id', user.id).maybeSingle(),
+    supabase.from('client_profiles').select('company_locked,preferred_company_id,company_profiles(name)').eq('user_id', user.id).maybeSingle(),
   ]);
   const companyBonusMinor = (bonuses ?? []).reduce((sum, item) => sum + Number(item.balance_minor), 0);
   const money = (minor: number | null | undefined) => `${(Number(minor ?? 0) / 100).toLocaleString('ru-RU')} ₸`;
@@ -55,6 +58,9 @@ export default async function ProfilePage() {
         <div><dt className="text-slate-400">Телефон</dt><dd className="mt-1 font-semibold">{profile?.phone ?? '—'}</dd></div>
         <div><dt className="text-slate-400">Статус</dt><dd className="mt-1 font-semibold">{profile?.status === 'active' ? 'Активен' : profile?.status ?? '—'}</dd></div>
       </dl>
+      {profile?.role === 'client' && <InvitationCard referralCode={referral?.code ?? null} companyName={(clientProfile?.company_profiles as { name?: string } | null)?.name ?? null} locked={Boolean(clientProfile?.company_locked)} />}
+      {profile?.role === 'client' && Boolean(bonuses?.length) && <div className="mt-8"><h2 className="text-lg font-black">Бонусы по компаниям</h2><div className="mt-3 space-y-2">{bonuses?.map((bonus) => <div key={bonus.company_id} className="flex justify-between rounded-2xl bg-lime-50 p-4 text-sm"><span>{(bonus.company_profiles as { name?: string } | null)?.name ?? 'Компания'}</span><b>{money(bonus.balance_minor)}</b></div>)}</div></div>}
+      {profile?.role === 'client' && Boolean(ledger?.length) && <div className="mt-8"><h2 className="text-lg font-black">История бонусов</h2><div className="mt-3 space-y-2">{ledger?.map((item) => <div key={item.id} className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 p-4 text-sm"><div><b>{item.description ?? item.operation}</b><p className="text-xs text-slate-500">{new Date(item.created_at).toLocaleString('ru-RU')}</p></div><b className={item.operation === 'order_use' ? 'text-red-600' : 'text-emerald-700'}>{item.operation === 'order_use' ? '−' : '+'}{money(item.amount_minor)}</b></div>)}</div></div>}
       {profile?.role === 'client' && <div className="mt-8">
         <h2 className="text-lg font-black">Последние заказы</h2>
         <div className="mt-3 space-y-2">{orders?.length ? orders.map((order) => <div className="rounded-2xl border border-slate-200 p-4" key={order.id}>
