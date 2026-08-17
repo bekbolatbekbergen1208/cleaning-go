@@ -130,6 +130,21 @@ begin
 end; $$;
 grant execute on function public.set_my_company_referral_settings(bigint,bigint,boolean) to authenticated;
 
+create or replace function public.set_my_company_service_cities(target_cities text[]) returns text[]
+language plpgsql security definer set search_path=public as $$
+declare cleaned text[];
+begin
+  select array_agg(distinct city order by city) into cleaned from (
+    select initcap(trim(value)) city from unnest(target_cities) value where length(trim(value)) between 2 and 80
+  ) cities;
+  if coalesce(array_length(cleaned,1),0)=0 then raise exception 'At least one city is required'; end if;
+  if array_length(cleaned,1)>20 then raise exception 'No more than 20 cities are allowed'; end if;
+  update company_profiles set service_cities=cleaned where owner_id=auth.uid();
+  if not found then raise exception 'Company not found'; end if;
+  return cleaned;
+end; $$;
+grant execute on function public.set_my_company_service_cities(text[]) to authenticated;
+
 create or replace function public.decide_company_membership(target_membership uuid,target_accept boolean) returns company_cleaners
 language plpgsql security definer set search_path=public as $$
 declare result company_cleaners;
