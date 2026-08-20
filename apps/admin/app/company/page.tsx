@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { createClient } from '../../lib/supabase/server';
 import { decideMembership, saveReferralSettings } from './actions';
 import { CopyCode } from './copy-code';
@@ -7,8 +8,12 @@ import { CopyCode } from './copy-code';
 type Membership = { id:string; requested_at:string; profiles:{full_name?:string;phone?:string}|null };
 export default async function CompanyHome() {
   const supabase=await createClient(); const {data:{user}}=await supabase.auth.getUser(); if(!user) redirect('/login');
-  const [{data:profile},{data:company}]=await Promise.all([supabase.from('profiles').select('full_name,role').eq('id',user.id).single(),supabase.from('company_profiles').select('id,name,company_code,verification_status,service_cities,welcome_bonus_minor,referral_bonus_minor,referral_enabled').eq('owner_id',user.id).single()]);
-  if(profile?.role!=='company_owner'||!company) redirect('/');
+  // Authorization is based on the verified auth user id. Load the matching
+  // role and company server-side so an RLS/cache hiccup cannot incorrectly
+  // send a valid company owner back to the public home page.
+  const admin=createAdminClient(process.env.SUPABASE_URL!,process.env.SUPABASE_SERVICE_ROLE_KEY!,{auth:{persistSession:false,autoRefreshToken:false}});
+  const [{data:profile,error:profileError},{data:company,error:companyError}]=await Promise.all([admin.from('profiles').select('full_name,role,status').eq('id',user.id).single(),admin.from('company_profiles').select('id,name,company_code,verification_status,service_cities,welcome_bonus_minor,referral_bonus_minor,referral_enabled').eq('owner_id',user.id).single()]);
+  if(profileError||companyError||profile?.role!=='company_owner'||profile.status!=='active'||!company) redirect('/login?error=company_account');
   const [{count:clients},{count:referralClients},{data:referrals},{data:ledger},{data:memberships}]=await Promise.all([
     supabase.from('company_code_uses').select('*',{count:'exact',head:true}).eq('company_id',company.id),
     supabase.from('company_code_uses').select('*',{count:'exact',head:true}).eq('company_id',company.id).eq('code_type','referral'),
