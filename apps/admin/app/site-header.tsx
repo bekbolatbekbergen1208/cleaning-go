@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 export function SiteHeader() {
   const pathname = usePathname();
   const isAdminLogin = pathname === '/admin/login';
-  const isAdmin = !isAdminLogin && ['/admin', '/orders', '/verifications', '/users', '/services', '/moderation', '/settings'].some((path) => pathname === path || pathname.startsWith(`${path}/`));
+  const isAdmin = !isAdminLogin && ['/admin', '/companies', '/orders', '/verifications', '/users', '/services', '/moderation', '/settings'].some((path) => pathname === path || pathname.startsWith(`${path}/`));
 
   return <><header className="site-header border-b bg-white">
     <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
