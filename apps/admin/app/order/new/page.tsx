@@ -9,7 +9,7 @@ export default async function NewOrderPage() {
 
   const [{ data: profile }, { data: services }, { data: clientProfile }, { data: bonuses }] = await Promise.all([
     supabase.from('profiles').select('role,status').eq('id', user.id).single(),
-    supabase.from('cleaning_services').select('id,name,description').eq('is_active', true).order('sort_order'),
+    supabase.from('cleaning_services').select('id,name,description,base_price_minor').eq('is_active', true).order('sort_order'),
     supabase.from('client_profiles').select('preferred_company_id,company_locked').eq('user_id', user.id).maybeSingle(),
     supabase.from('company_bonus_balances').select('company_id,balance_minor').eq('client_id', user.id),
   ]);
