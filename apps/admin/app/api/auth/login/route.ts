@@ -13,6 +13,19 @@ export async function POST(request: NextRequest) {
   }
 
   const cookiesToSet: CookieToSet[] = [];
+  const staleAuthCookieNames = request.cookies
+    .getAll()
+    .map(({ name }) => name)
+    .filter((name) => name.startsWith('sb-') && name.includes('-auth-token'));
+  const applyAuthCookies = (response: NextResponse) => {
+    // A previous, larger session can leave an extra chunk such as `.2` in the
+    // browser. Supabase then joins the new `.0`/`.1` cookies with that stale
+    // chunk and rejects the otherwise valid session. Remove every old chunk
+    // first; the fresh cookies below replace the chunks used by the new token.
+    staleAuthCookieNames.forEach((name) => response.cookies.set(name, '', { path: '/', maxAge: 0 }));
+    cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+    return response;
+  };
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -30,9 +43,7 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error || !data.user) {
-    const response = NextResponse.json({ error: 'Неверный email или пароль' }, { status: 401 });
-    cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
-    return response;
+    return applyAuthCookies(NextResponse.json({ error: 'Неверный email или пароль' }, { status: 401 }));
   }
 
   const { data: profile } = await supabase
@@ -43,12 +54,10 @@ export async function POST(request: NextRequest) {
 
   if (!profile?.role) {
     await supabase.auth.signOut({ scope: 'local' });
-    const response = NextResponse.json(
+    return applyAuthCookies(NextResponse.json(
       { error: 'Профиль аккаунта не найден. Обратитесь в поддержку.' },
       { status: 403 },
-    );
-    cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
-    return response;
+    ));
   }
 
   const destination = profile.role === 'admin'
@@ -56,7 +65,5 @@ export async function POST(request: NextRequest) {
     : profile.role === 'company_owner'
       ? '/company'
       : '/profile';
-  const response = NextResponse.json({ destination });
-  cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
-  return response;
+  return applyAuthCookies(NextResponse.json({ destination }));
 }
