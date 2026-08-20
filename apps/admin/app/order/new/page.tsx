@@ -17,9 +17,6 @@ export default async function NewOrderPage() {
 
   if (profile?.role !== 'client' || profile.status !== 'active') redirect('/profile');
 
-  const lockedCompanyIsAvailable = !clientProfile?.company_locked
-    || (companies ?? []).some((company) => company.id === clientProfile.preferred_company_id);
-
   return <div className="mx-auto max-w-2xl px-4 py-10">
     <h1 className="text-3xl font-black">Заказать клининг</h1>
     <p className="mt-2 text-sm text-slate-500">Компания посмотрит фотографию помещения и подтвердит итоговую цену.</p>
@@ -27,8 +24,7 @@ export default async function NewOrderPage() {
       services={services ?? []}
       companies={companies ?? []}
       preferredCompanyId={clientProfile?.preferred_company_id ?? null}
-      companyLocked={Boolean(clientProfile?.company_locked) && lockedCompanyIsAvailable}
-      unavailableLockedCompany={Boolean(clientProfile?.company_locked) && !lockedCompanyIsAvailable}
+      companyLocked={Boolean(clientProfile?.company_locked)}
       bonusBalances={Object.fromEntries((bonuses ?? []).map((item) => [item.company_id, Number(item.balance_minor)]))}
     />
   </div>;
