@@ -47,6 +47,7 @@ export default async function ProfilePage() {
       <h1 className="mt-3 text-3xl font-black">{profile?.full_name ?? 'Пользователь'}</h1>
       <p className="mt-2 text-sm font-semibold text-emerald-700">{roleNames[profile?.role ?? ''] ?? 'Пользователь'}</p>
       {profile?.role === 'client' && <Link href="/order/new" className="button mt-6 w-full">Заказать клининг</Link>}
+      {(profile?.role === 'cleaner' || profile?.role === 'company_cleaner') && <Link href="/cleaner/company-orders" className="button mt-6 w-full">Заказы компании</Link>}
       <div className="mt-8 grid grid-cols-2 gap-3">
         <div className="rounded-2xl bg-emerald-50 p-4"><p className="text-xs text-emerald-700">Доступно</p><p className="mt-1 text-xl font-black">{money(wallet?.available_minor)}</p></div>
         <div className="rounded-2xl bg-lime-50 p-4"><p className="text-xs text-lime-800">Бонус компании</p><p className="mt-1 text-xl font-black">{money(companyBonusMinor)}</p></div>
