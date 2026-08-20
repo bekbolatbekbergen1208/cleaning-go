@@ -1,7 +1,6 @@
 'use client';
 
 import { createClient } from '../../lib/supabase/client';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 export default function Login() {
@@ -9,7 +8,6 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -39,8 +37,9 @@ export default function Login() {
       : profile.role === 'company_owner'
         ? '/company'
         : '/profile';
-    router.replace(destination);
-    router.refresh();
+    // Use a full navigation after authentication so the server-rendered target
+    // receives the freshly written Supabase cookies on its very first request.
+    window.location.assign(destination);
   }
 
   return <div className="mx-auto mt-20 max-w-md card">
