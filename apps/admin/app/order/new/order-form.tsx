@@ -60,7 +60,8 @@ export function OrderForm({ services, companies, preferredCompanyId, companyLock
 
     const requestedBonusMinor = Math.round(Number(bonusKzt) * 100);
     if (requestedBonusMinor < 0 || requestedBonusMinor > availableBonusMinor) { setError('Указанная сумма превышает доступный бонус.'); setBusy(false); return; }
-    const { data: order, error: orderError } = await supabase.rpc(bonusBalances ? 'create_order_with_bonus' : 'create_order', { payload: {
+    const orderFunction = requestedBonusMinor > 0 ? 'create_order_with_bonus' : 'create_order';
+    const { data: order, error: orderError } = await supabase.rpc(orderFunction, { payload: {
       address_id: address.id,
       service_id: String(form.get('service_id')),
       selected_company_id: selectedCompanyId,
