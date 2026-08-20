@@ -1,6 +1,5 @@
 'use client';
 
-import { createClient } from '../../lib/supabase/client';
 import { useState } from 'react';
 
 export default function Login() {
@@ -13,33 +12,19 @@ export default function Login() {
     event.preventDefault();
     setError('');
     setLoading(true);
-    const supabase = createClient();
-    const { data, error: loginError } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
     });
+    const result = await response.json().catch(() => null) as { destination?: string; error?: string } | null;
 
-    if (loginError || !data.user) {
-      setError('Неверный email или пароль');
+    if (!response.ok || !result?.destination) {
+      setError(result?.error ?? 'Не удалось войти. Попробуйте ещё раз.');
       setLoading(false);
       return;
     }
-
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single();
-    if (!profile?.role) {
-      await supabase.auth.signOut();
-      setError('Профиль аккаунта не найден. Обратитесь в поддержку.');
-      setLoading(false);
-      return;
-    }
-    const destination = profile.role === 'admin'
-      ? '/admin'
-      : profile.role === 'company_owner'
-        ? '/company'
-        : '/profile';
-    // Use a full navigation after authentication so the server-rendered target
-    // receives the freshly written Supabase cookies on its very first request.
-    window.location.assign(destination);
+    window.location.assign(result.destination);
   }
 
   return <div className="mx-auto mt-20 max-w-md card">

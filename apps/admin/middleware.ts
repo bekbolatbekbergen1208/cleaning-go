@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
-const publicPaths = new Set(['/', '/register', '/login', '/admin/login', '/api/register']);
+const publicPaths = new Set(['/', '/register', '/login', '/admin/login', '/api/register', '/api/auth/login']);
 const adminPaths = ['/admin', '/orders', '/verifications', '/users', '/services', '/moderation', '/settings'];
 
 export async function middleware(request: NextRequest) {
