@@ -37,4 +37,19 @@ body { @apply bg-slate-50 text-slate-900 antialiased; }
   .landing-card { min-height: calc(100svh - 140px); border-radius: 0 0 28px 28px; padding: 28px 20px; }
   .landing-card h1 { font-size: 44px; }
   .landing-copy { padding: 38px 20px; }
+  .company-mobile-shell { width: 100%; overflow-x: hidden; }
+  .company-mobile-shell > div { width: 100%; padding: 20px 12px 28px; }
+  .company-mobile-shell h1 { font-size: 28px; line-height: 1.15; overflow-wrap: anywhere; }
+  .company-mobile-shell h2 { overflow-wrap: anywhere; }
+  .company-mobile-shell .card { min-width: 0; padding: 16px; }
+  .company-mobile-shell input,
+  .company-mobile-shell select,
+  .company-mobile-shell textarea { min-width: 0; font-size: 16px; }
+  .company-mobile-shell button,
+  .company-mobile-shell a { max-width: 100%; }
+  .company-mobile-shell article > div:first-child { align-items: flex-start; }
+  .company-mobile-shell article > div:first-child > span { max-width: 100%; white-space: normal; text-align: center; }
+  .company-mobile-shell article form { width: 100%; }
+  .company-mobile-shell article form button { width: 100%; }
+  .company-mobile-shell .tracking-wider { letter-spacing: .08em; overflow-wrap: anywhere; }
 }
