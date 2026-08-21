@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '../../lib/supabase/server';
 import { InvitationCard } from './invitation-card';
+import { confirmCompanyPrice } from './actions';
 
 const roleNames: Record<string, string> = {
   client: 'Клиент',
@@ -27,7 +28,7 @@ export default async function ProfilePage() {
     supabase.from('wallets').select('available_minor,pending_minor,currency').eq('owner_id', user.id).maybeSingle(),
     supabase.from('company_bonus_balances').select('company_id,balance_minor,company_profiles(name)').eq('client_id', user.id),
     supabase.from('company_bonus_ledger').select('id,operation,amount_minor,description,created_at,company_profiles(name)').eq('client_id', user.id).order('created_at', { ascending: false }).limit(10),
-    supabase.from('orders').select('id,order_number,status,scheduled_at,total_minor,reviews(id)').eq('client_id', user.id).order('created_at', { ascending: false }).limit(3),
+    supabase.from('orders').select('id,order_number,status,scheduled_at,total_minor,price_confirmed_at,reviews(id)').eq('client_id', user.id).order('created_at', { ascending: false }).limit(3),
     supabase.from('referral_codes').select('code').eq('owner_id', user.id).maybeSingle(),
     supabase.from('client_profiles').select('company_locked,preferred_company_id,company_profiles(name)').eq('user_id', user.id).maybeSingle(),
   ]);
@@ -67,6 +68,8 @@ export default async function ProfilePage() {
         <div className="mt-3 space-y-2">{orders?.length ? orders.map((order) => <div className="rounded-2xl border border-slate-200 p-4" key={order.id}>
           <div className="flex items-center justify-between gap-3"><b>{order.order_number}</b><span className="text-xs font-semibold text-emerald-700">{order.status}</span></div>
           <p className="mt-1 text-xs text-slate-500">{new Date(order.scheduled_at).toLocaleString('ru-RU')} · {money(order.total_minor)}</p>
+          {order.status === 'offered' && !order.price_confirmed_at && <form action={confirmCompanyPrice} className="mt-3"><input type="hidden" name="order_id" value={order.id}/><p className="mb-2 text-sm font-semibold">Компания предложила цену {money(order.total_minor)}</p><button className="button w-full">Подтвердить цену</button></form>}
+          {order.status === 'offered' && order.price_confirmed_at && <p className="mt-2 text-xs font-semibold text-emerald-700">Цена подтверждена. Компания формирует команду.</p>}
           {order.status === 'completed' && !order.reviews?.length && <Link className="mt-3 inline-flex text-sm font-bold text-emerald-700" href={`/order/${order.id}/review`}>Оценить уборку →</Link>}
           {order.reviews?.length ? <p className="mt-2 text-xs font-semibold text-emerald-700">Отзыв опубликован</p> : null}
         </div>) : <p className="text-sm text-slate-500">Заказов пока нет.</p>}</div>
