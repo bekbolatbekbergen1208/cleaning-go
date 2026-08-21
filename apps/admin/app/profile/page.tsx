@@ -42,7 +42,7 @@ export default async function ProfilePage() {
     const paths = ((order.photo_urls ?? []) as string[]).filter(path => path.includes('/completion-'));
     if (!paths.length) return;
     const { data } = await admin.storage.from('order-photos').createSignedUrls(paths, 3600);
-    completionPhotos.set(order.id, (data ?? []).map(item => item.signedUrl).filter(Boolean));
+    completionPhotos.set(order.id, (data ?? []).map(item => item.signedUrl).filter((url): url is string => Boolean(url)));
   }));
 
   async function signOut() {
