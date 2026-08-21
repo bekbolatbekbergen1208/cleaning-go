@@ -13,12 +13,13 @@ export default async function CompanyHome({ searchParams }: { searchParams: Prom
   // role and company server-side so an RLS/cache hiccup cannot incorrectly
   // send a valid company owner back to the public home page.
   const admin=createAdminClient(process.env.SUPABASE_URL!,process.env.SUPABASE_SERVICE_ROLE_KEY!,{auth:{persistSession:false,autoRefreshToken:false}});
-  // Keep the account check compatible with databases where the optional bonus
-  // columns have not been migrated yet. Selecting a missing optional column
-  // makes PostgREST reject the whole company row and used to cause a login loop.
-  const [{data:profile,error:profileError},{data:companyRow,error:companyError}]=await Promise.all([admin.from('profiles').select('full_name,role,status').eq('id',user.id).single(),admin.from('company_profiles').select('id,name,company_code,verification_status,service_cities,welcome_bonus_minor,referral_bonus_minor,referral_enabled').eq('owner_id',user.id).single()]);
+  // Do not include optional bonus columns in the authorization query. Older
+  // production schemas may not have them yet, and PostgREST would reject the
+  // entire company row and incorrectly send a valid owner back to login.
+  const [{data:profile,error:profileError},{data:companyRow,error:companyError}]=await Promise.all([admin.from('profiles').select('full_name,role,status').eq('id',user.id).single(),admin.from('company_profiles').select('id,name,company_code,verification_status,service_cities').eq('owner_id',user.id).single()]);
   if(profileError||companyError||profile?.role!=='company_owner'||profile.status!=='active'||!companyRow) redirect('/login?error=company_account');
-  const company=companyRow;
+  const {data:bonusSettings}=await admin.from('company_profiles').select('welcome_bonus_minor,referral_bonus_minor,referral_enabled').eq('id',companyRow.id).maybeSingle();
+  const company={...companyRow,welcome_bonus_minor:Number(bonusSettings?.welcome_bonus_minor??0),referral_bonus_minor:Number(bonusSettings?.referral_bonus_minor??0),referral_enabled:Boolean(bonusSettings?.referral_enabled)};
   const [{count:clients},{count:referralClients},{count:orders},{data:ledger},{data:memberships},{data:notifications}]=await Promise.all([
     supabase.from('company_code_uses').select('*',{count:'exact',head:true}).eq('company_id',company.id),
     supabase.from('company_code_uses').select('*',{count:'exact',head:true}).eq('company_id',company.id).eq('code_type','referral'),
