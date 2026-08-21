@@ -69,3 +69,34 @@ export async function publishCompanyOrder(formData: FormData) {
   revalidatePath('/company/orders');
   revalidatePath('/cleaner/company-orders');
 }
+
+export async function updatePublishedOrder(formData: FormData) {
+  const orderId = String(formData.get('order_id') ?? '');
+  const requiredWorkers = Number(formData.get('required_workers'));
+  const cleanerAmountMinor = Math.round(Number(formData.get('cleaner_amount_kzt')) * 100);
+  if (!orderId || !Number.isInteger(requiredWorkers) || requiredWorkers < 1 || requiredWorkers > 50) throw new Error('Укажите количество сотрудников от 1 до 50');
+  if (!Number.isFinite(cleanerAmountMinor) || cleanerAmountMinor < 0) throw new Error('Укажите выплату клинерам');
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Сначала войдите в аккаунт');
+  const { data: company } = await supabase.from('company_profiles').select('id').eq('owner_id', user.id).single();
+  if (!company) throw new Error('Компания не найдена');
+
+  const admin = createAdminClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data: order } = await admin.from('orders').select('id,total_minor').eq('id', orderId).eq('selected_company_id', company.id).eq('status', 'accepted').maybeSingle();
+  if (!order) throw new Error('Опубликованный заказ не найден');
+  if (cleanerAmountMinor > Number(order.total_minor)) throw new Error('Выплата клинерам не может превышать цену заказа');
+
+  const { count: occupiedWorkers } = await admin.from('order_workers').select('cleaner_id', { count: 'exact', head: true }).eq('order_id', orderId);
+  if (requiredWorkers < (occupiedWorkers ?? 0)) throw new Error(`Уже назначено клинеров: ${occupiedWorkers}`);
+
+  const { error } = await admin.from('orders').update({
+    required_workers: requiredWorkers,
+    executor_amount_minor: cleanerAmountMinor,
+  }).eq('id', orderId).eq('selected_company_id', company.id).eq('status', 'accepted');
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/company/orders');
+  revalidatePath('/cleaner/company-orders');
+}
