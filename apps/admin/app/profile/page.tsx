@@ -39,7 +39,7 @@ export default async function ProfilePage() {
   const admin = createAdminClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
   const completionPhotos = new Map<string, string[]>();
   await Promise.all((orders ?? []).map(async order => {
-    const paths = (order.photo_urls ?? []).filter(path => path.includes('/completion-'));
+    const paths = ((order.photo_urls ?? []) as string[]).filter(path => path.includes('/completion-'));
     if (!paths.length) return;
     const { data } = await admin.storage.from('order-photos').createSignedUrls(paths, 3600);
     completionPhotos.set(order.id, (data ?? []).map(item => item.signedUrl).filter(Boolean));
