@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '../../lib/supabase/server';
 import { InvitationCard } from './invitation-card';
-import { confirmCompanyPrice } from './actions';
+import { confirmCompanyPrice, confirmOrderCompletion } from './actions';
 
 const roleNames: Record<string, string> = {
   client: 'Клиент',
@@ -24,13 +24,14 @@ export default async function ProfilePage() {
   if (profile?.role === 'admin') redirect('/admin');
   if (profile?.role === 'company_owner') redirect('/company');
 
-  const [{ data: wallet }, { data: bonuses }, { data: ledger }, { data: orders }, { data: referral }, { data: clientProfile }] = await Promise.all([
+  const [{ data: wallet }, { data: bonuses }, { data: ledger }, { data: orders }, { data: referral }, { data: clientProfile }, { data: notifications }] = await Promise.all([
     supabase.from('wallets').select('available_minor,pending_minor,currency').eq('owner_id', user.id).maybeSingle(),
     supabase.from('company_bonus_balances').select('company_id,balance_minor,company_profiles(name)').eq('client_id', user.id),
     supabase.from('company_bonus_ledger').select('id,operation,amount_minor,description,created_at,company_profiles(name)').eq('client_id', user.id).order('created_at', { ascending: false }).limit(10),
     supabase.from('orders').select('id,order_number,status,scheduled_at,total_minor,price_confirmed_at,reviews(id)').eq('client_id', user.id).order('created_at', { ascending: false }).limit(3),
     supabase.from('referral_codes').select('code').eq('owner_id', user.id).maybeSingle(),
     supabase.from('client_profiles').select('company_locked,preferred_company_id,company_profiles(name)').eq('user_id', user.id).maybeSingle(),
+    supabase.from('notifications').select('id,title,body,created_at,read_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10),
   ]);
   const companyBonusMinor = (bonuses ?? []).reduce((sum, item) => sum + Number(item.balance_minor), 0);
   const money = (minor: number | null | undefined) => `${(Number(minor ?? 0) / 100).toLocaleString('ru-RU')} ₸`;
@@ -70,10 +71,12 @@ export default async function ProfilePage() {
           <p className="mt-1 text-xs text-slate-500">{new Date(order.scheduled_at).toLocaleString('ru-RU')} · {money(order.total_minor)}</p>
           {order.status === 'offered' && !order.price_confirmed_at && <form action={confirmCompanyPrice} className="mt-3"><input type="hidden" name="order_id" value={order.id}/><p className="mb-2 text-sm font-semibold">Компания предложила цену {money(order.total_minor)}</p><button className="button w-full">Подтвердить цену</button></form>}
           {order.status === 'offered' && order.price_confirmed_at && <p className="mt-2 text-xs font-semibold text-emerald-700">Цена подтверждена. Компания формирует команду.</p>}
+          {order.status === 'completed_by_cleaner' && <form action={confirmOrderCompletion} className="mt-3"><input type="hidden" name="order_id" value={order.id}/><p className="mb-2 text-sm font-semibold">Клинер завершил уборку. Проверьте результат.</p><button className="button w-full">Подтвердить завершение</button></form>}
           {order.status === 'completed' && !order.reviews?.length && <Link className="mt-3 inline-flex text-sm font-bold text-emerald-700" href={`/order/${order.id}/review`}>Оценить уборку →</Link>}
           {order.reviews?.length ? <p className="mt-2 text-xs font-semibold text-emerald-700">Отзыв опубликован</p> : null}
         </div>) : <p className="text-sm text-slate-500">Заказов пока нет.</p>}</div>
       </div>}
+      {Boolean(notifications?.length) && <div className="mt-8"><h2 className="text-lg font-black">Уведомления</h2><div className="mt-3 space-y-2">{notifications?.map(item => <div className="rounded-2xl bg-sky-50 p-4" key={item.id}><b className="text-sm">{item.title}</b><p className="mt-1 text-sm text-slate-600">{item.body}</p><p className="mt-1 text-xs text-slate-400">{new Date(item.created_at).toLocaleString('ru-RU')}</p></div>)}</div></div>}
       <form action={signOut} className="mt-8">
         <button className="button w-full" type="submit">Выйти</button>
       </form>
