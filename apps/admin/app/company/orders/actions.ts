@@ -7,7 +7,12 @@ import { createClient } from '../../../lib/supabase/server';
 export async function proposeCompanyPrice(formData: FormData) {
   const orderId = String(formData.get('order_id') ?? '');
   const totalMinor = Math.round(Number(formData.get('total_kzt')) * 100);
+  const requiredWorkers = Number(formData.get('required_workers'));
+  const cleanerAmountMinor = Math.round(Number(formData.get('cleaner_amount_kzt')) * 100);
   if (!orderId || !Number.isFinite(totalMinor) || totalMinor < 10000) throw new Error('Укажите цену от 100 ₸');
+  if (!Number.isInteger(requiredWorkers) || requiredWorkers < 1 || requiredWorkers > 50) throw new Error('Укажите количество клинеров от 1 до 50');
+  if (!Number.isFinite(cleanerAmountMinor) || cleanerAmountMinor < 0) throw new Error('Укажите выплату клинерам');
+  if (cleanerAmountMinor > totalMinor) throw new Error('Выплата клинерам не может превышать цену заказа');
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -23,6 +28,8 @@ export async function proposeCompanyPrice(formData: FormData) {
   const { error: priceError } = await admin.from('orders').update({
     subtotal_minor: totalMinor,
     total_minor: totalMinor,
+    required_workers: requiredWorkers,
+    executor_amount_minor: cleanerAmountMinor,
     status: 'offered',
     price_confirmed_at: null,
     price_confirmed_by: null,
@@ -34,8 +41,8 @@ export async function proposeCompanyPrice(formData: FormData) {
     order_id: order.id,
     type: 'company_price',
     title: 'Компания указала цену',
-    body: `Цена заказа: ${(totalMinor / 100).toLocaleString('ru-RU')} ₸`,
-    data: { total_minor: totalMinor },
+    body: `Цена заказа: ${(totalMinor / 100).toLocaleString('ru-RU')} ₸. После вашего подтверждения заказ будет опубликован для клинеров.`,
+    data: { total_minor: totalMinor, required_workers: requiredWorkers, executor_amount_minor: cleanerAmountMinor },
   });
   revalidatePath('/company/orders');
   revalidatePath('/profile');
