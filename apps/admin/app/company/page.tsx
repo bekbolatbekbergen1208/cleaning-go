@@ -6,7 +6,8 @@ import { decideMembership, saveReferralSettings } from './actions';
 import { CopyCode } from './copy-code';
 
 type Membership = { id:string; requested_at:string; profiles:{full_name?:string;phone?:string}|null };
-export default async function CompanyHome() {
+export default async function CompanyHome({ searchParams }: { searchParams: Promise<{ referral_saved?: string; referral_error?: string }> }) {
+  const params = await searchParams;
   const supabase=await createClient(); const {data:{user}}=await supabase.auth.getUser(); if(!user) redirect('/login');
   // Authorization is based on the verified auth user id. Load the matching
   // role and company server-side so an RLS/cache hiccup cannot incorrectly
@@ -15,9 +16,9 @@ export default async function CompanyHome() {
   // Keep the account check compatible with databases where the optional bonus
   // columns have not been migrated yet. Selecting a missing optional column
   // makes PostgREST reject the whole company row and used to cause a login loop.
-  const [{data:profile,error:profileError},{data:companyRow,error:companyError}]=await Promise.all([admin.from('profiles').select('full_name,role,status').eq('id',user.id).single(),admin.from('company_profiles').select('id,name,company_code,verification_status,service_cities').eq('owner_id',user.id).single()]);
+  const [{data:profile,error:profileError},{data:companyRow,error:companyError}]=await Promise.all([admin.from('profiles').select('full_name,role,status').eq('id',user.id).single(),admin.from('company_profiles').select('id,name,company_code,verification_status,service_cities,welcome_bonus_minor,referral_bonus_minor,referral_enabled').eq('owner_id',user.id).single()]);
   if(profileError||companyError||profile?.role!=='company_owner'||profile.status!=='active'||!companyRow) redirect('/login?error=company_account');
-  const company={...companyRow,welcome_bonus_minor:0,referral_bonus_minor:0,referral_enabled:false};
+  const company=companyRow;
   const [{count:clients},{count:referralClients},{count:orders},{data:ledger},{data:memberships},{data:notifications}]=await Promise.all([
     supabase.from('company_code_uses').select('*',{count:'exact',head:true}).eq('company_id',company.id),
     supabase.from('company_code_uses').select('*',{count:'exact',head:true}).eq('company_id',company.id).eq('code_type','referral'),
@@ -34,7 +35,7 @@ export default async function CompanyHome() {
     <Link className="card mt-5 block font-black" href="/company/cities">Выбрать города работы →</Link>
     <Link className="card mt-3 block font-black" href="/company/employees">Управлять сотрудниками →</Link>
     {Boolean(notifications?.length)&&<section className="card mt-5"><h2 className="text-xl font-black">Уведомления и новые запросы</h2><div className="mt-4 space-y-3">{notifications?.map(item=><div className="rounded-2xl bg-sky-50 p-4" key={item.id}><b>{item.title}</b><p className="mt-1 text-sm text-slate-600">{item.body}</p><p className="mt-1 text-xs text-slate-400">{new Date(item.created_at).toLocaleString('ru-RU')}</p></div>)}</div></section>}
-    <div className="mt-6 grid gap-5 lg:grid-cols-2"><form action={saveReferralSettings} className="card space-y-4"><h2 className="text-xl font-black">Бонусная программа</h2><label className="block text-sm font-semibold">Приветственный бонус, ₸<input className="input mt-1" name="welcome_bonus" type="number" min="0" max="10000" defaultValue={company.welcome_bonus_minor/100} required/></label><label className="block text-sm font-semibold">Бонус пригласившему, ₸<input className="input mt-1" name="referral_bonus" type="number" min="0" max="10000" defaultValue={company.referral_bonus_minor/100} required/></label><label className="flex gap-2 text-sm font-semibold"><input name="referral_enabled" type="checkbox" defaultChecked={company.referral_enabled}/> Реферальная программа включена</label><button className="button w-full">Сохранить</button></form>
+    <div className="mt-6 grid gap-5 lg:grid-cols-2"><form action={saveReferralSettings} className="card space-y-4"><h2 className="text-xl font-black">Бонусная программа</h2>{params.referral_saved==='1'&&<p className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700">Настройки сохранены.</p>}{params.referral_error&&<p className="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-600">Не удалось сохранить. Проверьте суммы и повторите.</p>}<label className="block text-sm font-semibold">Приветственный бонус, ₸<input className="input mt-1" name="welcome_bonus" type="number" min="0" max="10000" defaultValue={company.welcome_bonus_minor/100} required/></label><label className="block text-sm font-semibold">Бонус пригласившему, ₸<input className="input mt-1" name="referral_bonus" type="number" min="0" max="10000" defaultValue={company.referral_bonus_minor/100} required/></label><label className="flex gap-2 text-sm font-semibold"><input name="referral_enabled" type="checkbox" defaultChecked={company.referral_enabled}/> Реферальная программа включена</label><button className="button w-full">Сохранить</button></form>
     <section className="card"><h2 className="text-xl font-black">Заявки клинеров</h2><div className="mt-4 space-y-3">{(memberships as unknown as Membership[]|null)?.length?(memberships as unknown as Membership[]).map(m=><div className="rounded-2xl border p-4" key={m.id}><b>{m.profiles?.full_name??'Клинер'}</b><p className="text-sm text-slate-500">{m.profiles?.phone??'Телефон не указан'}</p><form action={decideMembership} className="mt-3 flex gap-2"><input type="hidden" name="membership_id" value={m.id}/><button className="button flex-1" name="decision" value="accept">Принять</button><button className="flex-1 rounded-xl border text-red-600" name="decision" value="reject">Отклонить</button></form></div>):<p className="text-sm text-slate-500">Новых заявок нет.</p>}</div></section></div>
   </div>;
 }
