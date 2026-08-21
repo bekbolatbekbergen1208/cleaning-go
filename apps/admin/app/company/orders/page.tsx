@@ -18,6 +18,13 @@ const statusNames: Record<string, string> = {
   cancelled: 'Отменён',
 };
 
+function contactPhone(phone?: string) {
+  let digits = (phone ?? '').replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('8')) digits = `7${digits.slice(1)}`;
+  if (digits.length === 10) digits = `7${digits}`;
+  return digits;
+}
+
 export default async function CompanyOrders() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -42,9 +49,10 @@ export default async function CompanyOrders() {
     <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-bold text-emerald-700">{company.name}</p><h1 className="text-3xl font-black">Заказы компании</h1></div><Link className="rounded-xl border px-4 py-2 font-bold" href="/company">← Кабинет</Link></div>
     {error ? <p className="card mt-6 text-red-600">Не удалось загрузить заказы: {error.message}</p> : orders?.length ? <div className="mt-6 space-y-3">{orders.map((order) => {
       const client = order.profiles as unknown as { full_name?: string; phone?: string } | null;
+      const phone = contactPhone(client?.phone);
       const waitingForClient = order.status === 'offered' && !order.price_confirmed_at;
       return <article className="card" key={order.id}>
-        <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-black">Заказ {order.order_number}</h2><p className="mt-1 text-sm text-slate-500">{client?.full_name ?? 'Клиент'} · {client?.phone ?? 'телефон не указан'}</p></div><span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">{statusNames[order.status] ?? order.status}</span></div>
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-black">Заказ {order.order_number}</h2><p className="mt-1 text-sm text-slate-500">{client?.full_name ?? 'Клиент'} · {client?.phone ?? 'телефон не указан'}</p>{phone && <div className="mt-3 flex flex-wrap gap-2"><a className="rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white" href={`https://wa.me/${phone}?text=${encodeURIComponent(`Здравствуйте! Пишем по вашему заказу ${order.order_number} в Cleaning Go.`)}`} target="_blank" rel="noreferrer">Написать в WhatsApp</a><a className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white" href={`tel:+${phone}`}>Позвонить</a></div>}</div><span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">{statusNames[order.status] ?? order.status}</span></div>
         <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2"><p><b>Адрес:</b> {order.city}, {order.address_text}</p><p><b>Дата:</b> {new Date(order.scheduled_at).toLocaleString('ru-KZ')}</p><p><b>Помещение:</b> {order.area_sq_m} м², {order.rooms_count} комн.</p><p><b>Сумма:</b> {(Number(order.total_minor) / 100).toLocaleString('ru-RU')} ₸</p></div>
         {order.status === 'searching' ? <form action={proposeCompanyPrice} className="mt-5 grid gap-3 rounded-2xl bg-emerald-50 p-4 sm:grid-cols-3">
           <input type="hidden" name="order_id" value={order.id}/>
