@@ -58,7 +58,7 @@ export default async function ProfilePage() {
       <h1 className="mt-3 text-3xl font-black">{profile?.full_name ?? 'Пользователь'}</h1>
       <p className="mt-2 text-sm font-semibold text-emerald-700">{roleNames[profile?.role ?? ''] ?? 'Пользователь'}</p>
       {profile?.role === 'client' && <Link href="/order/new" className="button mt-6 w-full">Заказать клининг</Link>}
-      {(profile?.role === 'cleaner' || profile?.role === 'company_cleaner') && <Link href="/cleaner/company-orders" className="button mt-6 w-full">Заказы компании</Link>}
+      {(profile?.role === 'cleaner' || profile?.role === 'company_cleaner') && <div className="mt-6 grid gap-3 sm:grid-cols-2"><Link href="/cleaner/company-orders" className="button w-full">Найти заказы</Link><Link href="/cleaner/my-work" className="rounded-xl border border-emerald-600 px-4 py-3 text-center font-bold text-emerald-700">Моя работа</Link></div>}
       <div className="mt-8 grid grid-cols-2 gap-3">
         <div className="rounded-2xl bg-emerald-50 p-4"><p className="text-xs text-emerald-700">Доступно</p><p className="mt-1 text-xl font-black">{money(wallet?.available_minor)}</p></div>
         <div className="rounded-2xl bg-lime-50 p-4"><p className="text-xs text-lime-800">Бонус компании</p><p className="mt-1 text-xl font-black">{money(companyBonusMinor)}</p></div>
