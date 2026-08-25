@@ -15,7 +15,7 @@ export default async function CleanerMyWorkPage() {
   const admin = createAdminClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: profile } = await admin.from('profiles').select('role,status').eq('id', user.id).maybeSingle();
   if (!profile || !['cleaner', 'company_cleaner'].includes(profile.role) || profile.status !== 'active') redirect('/profile');
-  const { data: assignments, error: assignmentError } = await admin.from('order_workers').select('order_id,created_at').eq('cleaner_id', user.id).order('created_at', { ascending: false });
+  const { data: assignments, error: assignmentError } = await admin.from('order_workers').select('order_id,joined_at').eq('cleaner_id', user.id).order('joined_at', { ascending: false });
   const orderIds = (assignments ?? []).map(item => item.order_id);
   const { data: orders, error: ordersError } = orderIds.length
     ? await admin.from('orders').select('id,order_number,status,address_text,city,scheduled_at,area_sq_m,rooms_count,executor_amount_minor,required_workers,company_profiles!selected_company_id(name)').in('id', orderIds).order('scheduled_at', { ascending: false })
