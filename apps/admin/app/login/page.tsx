@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 
 export default function Login() {
@@ -36,5 +37,9 @@ export default function Login() {
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button className="button w-full" disabled={loading}>{loading ? 'Входим…' : 'Войти'}</button>
     </form>
+    <div className="mt-6 border-t border-slate-200 pt-5 text-center">
+      <p className="text-sm text-slate-500">Нет аккаунта?</p>
+      <Link href="/register" className="mt-2 inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-emerald-600 px-4 font-bold text-emerald-700 transition hover:bg-emerald-50">Зарегистрироваться</Link>
+    </div>
   </div>;
 }

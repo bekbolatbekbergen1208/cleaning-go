@@ -17,6 +17,7 @@ body { @apply bg-slate-50 text-slate-900 antialiased; }
 
 .site-header { position: sticky; top: 0; z-index: 40; background: rgba(255,255,255,.92); backdrop-filter: blur(16px); }
 .mobile-tabbar { display: none; }
+.mobile-register-button { display: none; }
 .header-order-button { border-radius: 12px; background: #087562; padding: 10px 16px; color: white; transition: .2s ease; }
 .header-order-button:hover { background: #065e50; }
 .public-home { display: grid; gap: 72px; padding-bottom: 40px; }
@@ -65,6 +66,7 @@ body { @apply bg-slate-50 text-slate-900 antialiased; }
   body { background: #fff; }
   .site-header > div { min-height: 58px; padding: 10px 16px; }
   .desktop-public-nav { display: none; }
+  .mobile-register-button { display: inline-flex; min-height: 38px; align-items: center; border-radius: 11px; background: #087562; padding: 0 14px; color: white; font-size: 13px; font-weight: 800; }
   .site-main { padding: 0 0 calc(84px + env(safe-area-inset-bottom)); }
   .mobile-tabbar {
     position: fixed; z-index: 50; display: grid; grid-template-columns: repeat(4, 1fr);
