@@ -4,6 +4,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { createClient } from '../../lib/supabase/server';
 import { InvitationCard } from './invitation-card';
 import { confirmCompanyPrice, confirmOrderCompletion } from './actions';
+import { CancelOrderButton } from './cancel-order-button';
 
 const roleNames: Record<string, string> = {
   client: 'Клиент',
@@ -80,6 +81,7 @@ export default async function ProfilePage() {
           <p className="mt-1 text-xs text-slate-500">{new Date(order.scheduled_at).toLocaleString('ru-RU')} · {money(order.total_minor)}</p>
           {order.status === 'offered' && !order.price_confirmed_at && <form action={confirmCompanyPrice} className="mt-3"><input type="hidden" name="order_id" value={order.id}/><p className="mb-2 text-sm font-semibold">Компания предложила цену {money(order.total_minor)}</p><button className="button w-full">Подтвердить цену</button></form>}
           {order.status === 'offered' && order.price_confirmed_at && <p className="mt-2 text-xs font-semibold text-emerald-700">Цена подтверждена. Компания формирует команду.</p>}
+          {['created','searching','offered'].includes(order.status) && !order.price_confirmed_at && <CancelOrderButton orderId={order.id}/>}
           {order.status === 'completed_by_cleaner' && <form action={confirmOrderCompletion} className="mt-3"><input type="hidden" name="order_id" value={order.id}/><p className="mb-2 text-sm font-semibold">Клинер завершил уборку. Проверьте результат.</p><button className="button w-full">Подтвердить завершение</button></form>}
           {Boolean(completionPhotos.get(order.id)?.length) && <div className="mt-3"><p className="mb-2 text-sm font-bold">Фотоотчёт клинера</p><div className="grid grid-cols-2 gap-2">{completionPhotos.get(order.id)?.map((url, index) => <a href={url} target="_blank" rel="noreferrer" key={url}><img className="h-32 w-full rounded-xl object-cover" src={url} alt={`Фотоотчёт ${index + 1}`}/></a>)}</div></div>}
           {order.status === 'completed' && !order.reviews?.length && <Link className="mt-3 inline-flex text-sm font-bold text-emerald-700" href={`/order/${order.id}/review`}>Оценить уборку →</Link>}

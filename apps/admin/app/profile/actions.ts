@@ -51,3 +51,41 @@ export async function confirmOrderCompletion(formData: FormData) {
   revalidatePath('/cleaner/company-orders');
   revalidatePath('/company/orders');
 }
+
+export async function cancelOrder(formData: FormData) {
+  const orderId = String(formData.get('order_id') ?? '');
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || !orderId) throw new Error('Заказ не найден');
+
+  const admin = createAdminClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data: order } = await admin
+    .from('orders')
+    .select('id,status,selected_company_id')
+    .eq('id', orderId)
+    .eq('client_id', user.id)
+    .in('status', ['created', 'searching', 'offered'])
+    .maybeSingle();
+  if (!order) throw new Error('Этот заказ уже нельзя отменить');
+
+  const cancelledAt = new Date().toISOString();
+  const { data: cancelled, error } = await admin
+    .from('orders')
+    .update({ status: 'cancelled', cancelled_at: cancelledAt })
+    .eq('id', order.id)
+    .eq('client_id', user.id)
+    .eq('status', order.status)
+    .select('id')
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!cancelled) throw new Error('Статус заказа уже изменился. Обновите страницу.');
+
+  await admin.from('order_status_history').insert({ order_id: order.id, from_status: order.status, to_status: 'cancelled', changed_by: user.id, note: 'Клиент отменил заказ' });
+  if (order.selected_company_id) {
+    const { data: company } = await admin.from('company_profiles').select('owner_id').eq('id', order.selected_company_id).maybeSingle();
+    if (company?.owner_id) await admin.from('notifications').insert({ user_id: company.owner_id, order_id: order.id, type: 'order_cancelled', title: 'Заказ отменён', body: 'Клиент отменил заказ до начала выполнения' });
+  }
+
+  revalidatePath('/profile');
+  revalidatePath('/company/orders');
+}
