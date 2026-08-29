@@ -38,6 +38,22 @@ export default async function ProfilePage() {
   const companyBonusMinor = (bonuses ?? []).reduce((sum, item) => sum + Number(item.balance_minor), 0);
   const money = (minor: number | null | undefined) => `${(Number(minor ?? 0) / 100).toLocaleString('ru-RU')} ₸`;
   const admin = createAdminClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
+  const isCleaner = profile?.role === 'cleaner' || profile?.role === 'company_cleaner';
+  let availableMinor = Number(wallet?.available_minor ?? 0);
+  let pendingMinor = Number(wallet?.pending_minor ?? 0);
+  if (isCleaner) {
+    const { data: assignments } = await admin.from('order_workers').select('order_id').eq('cleaner_id', user.id);
+    const assignedOrderIds = (assignments ?? []).map(item => item.order_id);
+    const { data: cleanerOrders } = assignedOrderIds.length
+      ? await admin.from('orders').select('status,executor_amount_minor,required_workers').in('id', assignedOrderIds)
+      : { data: [] };
+    availableMinor = (cleanerOrders ?? [])
+      .filter(order => order.status === 'completed')
+      .reduce((sum, order) => sum + Math.floor(Number(order.executor_amount_minor) / Math.max(1, Number(order.required_workers))), 0);
+    pendingMinor = (cleanerOrders ?? [])
+      .filter(order => ['accepted','on_the_way','arrived','in_progress','completed_by_cleaner'].includes(order.status))
+      .reduce((sum, order) => sum + Math.floor(Number(order.executor_amount_minor) / Math.max(1, Number(order.required_workers))), 0);
+  }
   const completionPhotos = new Map<string, string[]>();
   await Promise.all((orders ?? []).map(async order => {
     const paths = ((order.photo_urls ?? []) as string[]).filter(path => path.includes('/completion-'));
@@ -61,9 +77,9 @@ export default async function ProfilePage() {
       {profile?.role === 'client' && <Link href="/order/new" className="button mt-6 w-full">Заказать клининг</Link>}
       {(profile?.role === 'cleaner' || profile?.role === 'company_cleaner') && <div className="mt-6 grid gap-3 sm:grid-cols-2"><Link href="/cleaner/company-orders" className="button w-full">Найти заказы</Link><Link href="/cleaner/my-work" className="rounded-xl border border-emerald-600 px-4 py-3 text-center font-bold text-emerald-700">Моя работа</Link></div>}
       <div className="mt-8 grid grid-cols-2 gap-3">
-        <div className="rounded-2xl bg-emerald-50 p-4"><p className="text-xs text-emerald-700">Доступно</p><p className="mt-1 text-xl font-black">{money(wallet?.available_minor)}</p></div>
+        <div className="rounded-2xl bg-emerald-50 p-4"><p className="text-xs text-emerald-700">{isCleaner ? 'Заработано' : 'Доступно'}</p><p className="mt-1 text-xl font-black">{money(availableMinor)}</p></div>
         <div className="rounded-2xl bg-lime-50 p-4"><p className="text-xs text-lime-800">Бонус компании</p><p className="mt-1 text-xl font-black">{money(companyBonusMinor)}</p></div>
-        <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs text-slate-500">Ожидается</p><p className="mt-1 text-xl font-black">{money(wallet?.pending_minor)}</p></div>
+        <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs text-slate-500">Ожидается</p><p className="mt-1 text-xl font-black">{money(pendingMinor)}</p></div>
         <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs text-slate-500">Реферальный код</p><p className="mt-1 truncate text-lg font-black">{referral?.code ?? '—'}</p></div>
       </div>
       <dl className="mt-8 space-y-4 text-sm">
