@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { bodyIsTooLarge, hasJsonContentType } from '../../../lib/request-security';
 
-const attempts = new Map<string, { count: number; resetAt: number }>();
 const roles = new Set(['client', 'cleaner', 'company_owner']);
 
 function corsHeaders(request: NextRequest) {
@@ -18,24 +18,18 @@ export async function OPTIONS(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const headers = corsHeaders(request);
   if (!headers) return NextResponse.json({ error: 'Origin is not allowed' }, { status: 403 });
-
-  const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  const key = forwarded || 'local';
-  const now = Date.now();
-  const rate = attempts.get(key);
-  if (rate && rate.resetAt > now && rate.count >= 5) return NextResponse.json({ error: 'Слишком много регистраций. Попробуйте позже.' }, { status: 429, headers });
-  attempts.set(key, rate && rate.resetAt > now ? { ...rate, count: rate.count + 1 } : { count: 1, resetAt: now + 60 * 60 * 1000 });
+  if (!hasJsonContentType(request) || bodyIsTooLarge(request)) return NextResponse.json({ error: 'Некорректный запрос.' }, { status: 400, headers });
 
   try {
     const body = await request.json();
-    const email = String(body.email ?? '').trim().toLowerCase();
+    const email = String(body.email ?? '').trim().toLowerCase().slice(0, 254);
     const password = String(body.password ?? '');
     const role = String(body.role ?? '');
     const fullName = String(body.full_name ?? '').trim();
     const rawPhone = String(body.phone ?? '').trim();
     const digits = rawPhone.replace(/\D/g, '');
     const phone = digits.length === 11 && digits.startsWith('8') ? `+7${digits.slice(1)}` : `+${digits}`;
-    if (!/^\S+@\S+\.\S+$/.test(email) || !/^\+[1-9]\d{9,14}$/.test(phone) || password.length < 8 || fullName.length < 2 || !roles.has(role)) {
+    if (!/^\S+@\S+\.\S+$/.test(email) || !/^\+[1-9]\d{9,14}$/.test(phone) || password.length < 8 || password.length > 256 || fullName.length < 2 || fullName.length > 120 || !roles.has(role)) {
       return NextResponse.json({ error: 'Проверьте имя, email, номер телефона, пароль и роль.' }, { status: 400, headers });
     }
     if (role === 'company_owner' && ['company_name', 'company_registration_number', 'company_city', 'company_address', 'company_phone'].some((field) => !String(body[field] ?? '').trim())) {
@@ -49,8 +43,9 @@ export async function POST(request: NextRequest) {
       .or(`email.ilike.${email},phone.eq.${phone}`)
       .limit(1);
     if (profileLookupError) return NextResponse.json({ error: 'Не удалось проверить регистрационные данные.' }, { status: 503, headers });
-    if (existingProfiles?.some((item) => item.email?.toLowerCase() === email)) return NextResponse.json({ error: 'Этот email уже зарегистрирован.' }, { status: 409, headers });
-    if (existingProfiles?.some((item) => item.phone === phone)) return NextResponse.json({ error: 'Этот номер телефона уже зарегистрирован.' }, { status: 409, headers });
+    if (existingProfiles?.some((item) => item.email?.toLowerCase() === email || item.phone === phone)) {
+      return NextResponse.json({ error: 'Аккаунт с такими данными уже существует.' }, { status: 409, headers });
+    }
     if (role === 'company_owner') {
       const registrationNumber = String(body.company_registration_number).trim();
       const { data: existingCompany, error: companyLookupError } = await admin.from('company_profiles').select('id').eq('registration_number', registrationNumber).maybeSingle();
@@ -77,7 +72,7 @@ export async function POST(request: NextRequest) {
     });
     if (error) {
       console.error('Registration failed:', { code: error.code, status: error.status, message: error.message });
-      return NextResponse.json({ error: `Supabase отклонил регистрацию: ${error.message}` }, { status: error.status === 422 ? 409 : 400, headers });
+      return NextResponse.json({ error: error.status === 422 ? 'Пользователь с такими данными уже существует.' : 'Не удалось создать аккаунт.' }, { status: error.status === 422 ? 409 : 400, headers });
     }
     if (role === 'client' && body.referral_code) {
       const code = String(body.referral_code).trim().toUpperCase();

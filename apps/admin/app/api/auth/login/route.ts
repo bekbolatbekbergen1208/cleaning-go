@@ -1,14 +1,24 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { bodyIsTooLarge, clientIp, hasJsonContentType, isRateLimited, isSameOriginRequest } from '../../../../lib/request-security';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
 export async function POST(request: NextRequest) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ error: 'Origin is not allowed' }, { status: 403 });
+  }
+  if (!hasJsonContentType(request) || bodyIsTooLarge(request)) {
+    return NextResponse.json({ error: 'Некорректный запрос' }, { status: 400 });
+  }
+  if (isRateLimited(`login:${clientIp(request)}`, 10, 15 * 60 * 1000)) {
+    return NextResponse.json({ error: 'Слишком много попыток входа. Попробуйте через 15 минут.' }, { status: 429 });
+  }
   const body = await request.json().catch(() => null) as { email?: string; password?: string } | null;
-  const email = body?.email?.trim().toLowerCase();
+  const email = body?.email?.trim().toLowerCase().slice(0, 254);
   const password = body?.password;
 
-  if (!email || !password) {
+  if (!email || !password || password.length > 256) {
     return NextResponse.json({ error: 'Введите email и пароль' }, { status: 400 });
   }
 
