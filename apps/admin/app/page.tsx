@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { createClient } from '../lib/supabase/server';
 
 const services = [
   { icon: '⌂', title: 'Уборка квартиры', text: 'Регулярная или разовая уборка', color: 'mint' },
@@ -15,7 +17,20 @@ const advantages = [
   ['₸', 'Понятная стоимость', 'Цена известна до подтверждения заказа.'],
 ];
 
-export default function PublicHome() {
+export default async function PublicHome() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profile?.role === 'company_owner') redirect('/company');
+  }
+
   return <div className="public-home">
     <section className="home-hero">
       <div className="home-hero-copy">
