@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
-import { createClient } from '../../../../lib/supabase/client';
+import { publishReview } from './actions';
 
 export function ReviewForm({ orderId }: { orderId: string }) {
   const router = useRouter();
@@ -18,16 +18,9 @@ export function ReviewForm({ orderId }: { orderId: string }) {
     submitting.current = true;
     setBusy(true);
     setError('');
-    const { error: reviewError } = await createClient().rpc('create_review', {
-      target_order_id: orderId,
-      target_rating: rating,
-      target_text: text.trim() || null,
-      target_tags: [],
-    });
-    // A repeated request means the first one was already saved successfully.
-    const alreadyPublished = reviewError?.code === '23505' || reviewError?.message.includes('reviews_order_id_key');
-    if (reviewError && !alreadyPublished) {
-      setError('Не удалось опубликовать отзыв. Попробуйте ещё раз.');
+    const result = await publishReview(orderId, rating, text);
+    if (result.error) {
+      setError(result.error);
       submitting.current = false;
       setBusy(false);
       return;
