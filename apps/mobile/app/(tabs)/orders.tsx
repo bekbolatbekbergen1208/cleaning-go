@@ -9,7 +9,7 @@ import { Alert, Text } from 'react-native';
 type OrderWithWorkers = Order & { required_workers?: number };
 
 const names: Record<string, string> = {
-  searching: 'Ожидает компанию', accepted: 'Принят', on_the_way: 'В пути', arrived: 'Прибыл',
+  searching: 'Ожидает компанию', accepted: 'Опубликован в сообществе', on_the_way: 'В пути', arrived: 'Прибыл',
   in_progress: 'Уборка идёт', completed_by_cleaner: 'Ожидает подтверждения', completed: 'Завершён',
   cancelled: 'Отменён', disputed: 'Спор',
 };
@@ -89,7 +89,7 @@ export default function Orders() {
 
   return (
     <Screen>
-      <Title subtitle={canAccept ? 'Заказы ваших клиентов и назначенные работы' : 'Следите за каждым этапом'}>Заказы</Title>
+      <Title subtitle={role === 'cleaner' || role === 'company_cleaner' ? 'Общие заказы от клининговых компаний' : canAccept ? 'Заказы ваших клиентов' : 'Следите за каждым этапом'}>{role === 'cleaner' || role === 'company_cleaner' ? 'Сообщество' : 'Заказы'}</Title>
       {loading ? <Text>Загрузка…</Text> : items.length ? items.map((order) => (
         <Card key={order.id}>
           <Text style={s.cardTitle}>№ {order.order_number}</Text>

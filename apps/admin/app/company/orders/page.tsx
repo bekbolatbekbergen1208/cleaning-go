@@ -71,7 +71,7 @@ export default async function CompanyOrders() {
           <p className="text-sm text-emerald-700 sm:col-span-3">Когда клиент подтвердит цену, заказ сразу появится у клинеров.</p>
           <button className="button sm:col-span-3">Отправить цену клиенту</button>
         </form> : waitingForClient ? <div className="mt-4 rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-700"><p>Ожидаем подтверждения цены клиентом</p><p className="mt-1">Клинеров: {order.required_workers} · Выплата: {(Number(order.executor_amount_minor) / 100).toLocaleString('ru-RU')} ₸</p></div> : order.status === 'accepted' ? <form action={updatePublishedOrder} className="mt-5 grid gap-3 rounded-2xl bg-blue-50 p-4 sm:grid-cols-2">
-          <input type="hidden" name="order_id" value={order.id}/><p className="font-bold text-blue-700 sm:col-span-2">Заказ опубликован для клинеров компании</p>
+          <input type="hidden" name="order_id" value={order.id}/><p className="font-bold text-blue-700 sm:col-span-2">Заказ опубликован в общем сообществе клинеров</p>
           <label className="text-sm font-bold text-blue-900">Количество клинеров<input className="input mt-1 bg-white" name="required_workers" type="number" min="1" max="50" defaultValue={order.required_workers ?? 1} required/></label>
           <label className="text-sm font-bold text-blue-900">Общая выплата клинерам, ₸<input className="input mt-1 bg-white" name="cleaner_amount_kzt" type="number" min="0" max={Number(order.total_minor)/100} defaultValue={Number(order.executor_amount_minor)/100} required/></label>
           <p className="text-sm text-blue-700 sm:col-span-2">Выплата одному клинеру будет рассчитана из общей суммы.</p><button className="button sm:col-span-2">Сохранить количество и выплату</button>

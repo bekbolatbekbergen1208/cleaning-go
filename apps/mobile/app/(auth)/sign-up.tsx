@@ -35,7 +35,7 @@ export default function SignUp() {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
-  const cleanerCodeRequired = role === 'cleaner';
+  const cleanerCodeRequired = false;
   const isCompany = role === 'company_owner';
 
   function showFeedback(kind: Feedback['kind'], title: string, body: string) {
@@ -46,7 +46,10 @@ export default function SignUp() {
   function chooseRole(value: Role) {
     setRole(value);
     setFeedback(null);
-    if (value === 'cleaner') setHasCode(true);
+    if (value === 'cleaner') {
+      setHasCode(false);
+      setReferralCode('');
+    }
     if (value === 'company_owner') {
       setHasCode(false);
       setReferralCode('');
@@ -164,8 +167,8 @@ export default function SignUp() {
         <View style={x.roles}>
           {([
             ['client', 'Клиент', 'Заказать уборку'],
-            ['cleaner', 'Клинер', 'Получать заказы'],
-            ['company_owner', 'Компания', 'Управлять командой'],
+            ['cleaner', 'Клинер', 'Брать заказы в сообществе'],
+            ['company_owner', 'Компания', 'Вести клиентов и заказы'],
           ] as const).map(([value, label, description]) => (
             <Pressable key={value} onPress={() => chooseRole(value)} style={[x.role, role === value && x.roleActive]}>
               <Text style={[x.roleTitle, role === value && x.roleTitleActive]}>{label}</Text>
@@ -190,7 +193,7 @@ export default function SignUp() {
         </Card>
       ) : null}
 
-      {!isCompany ? <Card>
+      {!isCompany && role === 'client' ? <Card>
         <View>
           <Text style={x.codeTitle}>{cleanerCodeRequired ? 'Введите специальный код' : 'У вас есть специальный код?'}</Text>
           <Text style={s.muted}>
