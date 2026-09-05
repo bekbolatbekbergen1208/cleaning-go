@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireAdmin } from '../../lib/require-admin';
 import { createCommunity, deleteCommunity, toggleCommunity } from './actions';
 import { DeleteCommunityButton } from './delete-community-button';
+import { ShareCommunityButton } from './share-community-button';
 
 export default async function CommunitiesPage() {
   await requireAdmin();
@@ -31,7 +32,8 @@ export default async function CommunitiesPage() {
             <div><h2 className="text-xl font-black">{item.name}</h2><p className="text-sm text-slate-500">{item.description || 'Без описания'}</p><p className="mt-3 text-sm">Компаний: <b>{companies}</b> · Клинеров: <b>{cleaners}</b></p></div>
             <div className="text-right">
               <p className="rounded-xl bg-emerald-50 px-4 py-2 font-mono text-xl font-black text-emerald-800">{item.code}</p>
-              <div className="mt-3 flex justify-end gap-4">
+              <div className="mt-3 flex flex-wrap justify-end gap-4">
+                <ShareCommunityButton code={item.code} name={item.name}/>
                 <form action={toggleCommunity}><input type="hidden" name="id" value={item.id}/><input type="hidden" name="active" value={item.is_active ? 'false' : 'true'}/><button className="text-sm font-bold">{item.is_active ? 'Отключить' : 'Включить'}</button></form>
                 <form action={deleteCommunity}><input type="hidden" name="id" value={item.id}/><DeleteCommunityButton name={item.name}/></form>
               </div>
