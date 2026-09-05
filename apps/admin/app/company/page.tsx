@@ -17,9 +17,11 @@ export default async function CompanyHome({ searchParams }: { searchParams: Prom
   // entire company row and incorrectly send a valid owner back to login.
   const [{data:profile,error:profileError},{data:companyRow,error:companyError}]=await Promise.all([admin.from('profiles').select('full_name,role,status').eq('id',user.id).single(),admin.from('company_profiles').select('id,name,company_code,verification_status,service_cities').eq('owner_id',user.id).single()]);
   if(profileError||companyError||profile?.role!=='company_owner'||profile.status!=='active'||!companyRow) redirect('/login?error=company_account');
-  const {data:bonusSettings}=await admin.from('company_profiles').select('welcome_bonus_minor,referral_bonus_minor,referral_enabled').eq('id',companyRow.id).maybeSingle();
+  const [{data:bonusSettings},{data:communityMembership}]=await Promise.all([
+    admin.from('company_profiles').select('welcome_bonus_minor,referral_bonus_minor,referral_enabled').eq('id',companyRow.id).maybeSingle(),
+    admin.from('community_companies').select('cleaner_communities(name,code,is_active)').eq('company_id',companyRow.id).maybeSingle(),
+  ]);
   const company={...companyRow,welcome_bonus_minor:Number(bonusSettings?.welcome_bonus_minor??0),referral_bonus_minor:Number(bonusSettings?.referral_bonus_minor??0),referral_enabled:Boolean(bonusSettings?.referral_enabled)};
-  const {data:communityMembership}=await admin.from('community_companies').select('cleaner_communities(name,code,is_active)').eq('company_id',company.id).maybeSingle();
   const community=communityMembership?.cleaner_communities as unknown as {name:string;code:string;is_active:boolean}|null;
   const [{count:clients},{count:referralClients},{count:orders},{data:completedOrders},{data:ledger},{data:notifications}]=await Promise.all([
     supabase.from('company_code_uses').select('*',{count:'exact',head:true}).eq('company_id',company.id),
