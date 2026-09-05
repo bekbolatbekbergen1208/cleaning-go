@@ -25,3 +25,7 @@ export async function decideMembership(formData: FormData) {
   const { error } = await supabase.rpc('decide_company_membership', { target_membership: String(formData.get('membership_id')), target_accept: formData.get('decision') === 'accept' });
   if (error) throw new Error(error.message); revalidatePath('/company');
 }
+export async function joinCommunity(formData: FormData) {
+  const code=String(formData.get('community_code')??'').trim().toUpperCase(); if(!code) throw new Error('Введите код сообщества');
+  const supabase=await createClient(); const {error}=await supabase.rpc('join_company_community',{community_code:code}); if(error) throw new Error(error.message); revalidatePath('/company');
+}

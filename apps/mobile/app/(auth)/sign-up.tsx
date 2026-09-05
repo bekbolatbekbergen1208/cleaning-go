@@ -35,7 +35,7 @@ export default function SignUp() {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
-  const cleanerCodeRequired = false;
+  const cleanerCodeRequired = role === 'cleaner';
   const isCompany = role === 'company_owner';
 
   function showFeedback(kind: Feedback['kind'], title: string, body: string) {
@@ -46,10 +46,7 @@ export default function SignUp() {
   function chooseRole(value: Role) {
     setRole(value);
     setFeedback(null);
-    if (value === 'cleaner') {
-      setHasCode(false);
-      setReferralCode('');
-    }
+    if (value === 'cleaner') setHasCode(true);
     if (value === 'company_owner') {
       setHasCode(false);
       setReferralCode('');
@@ -60,7 +57,7 @@ export default function SignUp() {
     setFeedback(null);
 
     if (cleanerCodeRequired && !referralCode.trim()) {
-      showFeedback('error', 'Код обязателен для клинера', 'Введите специальный код, полученный от компании или Cleaning Go.');
+      showFeedback('error', 'Код обязателен для клинера', 'Введите код сообщества, созданного администратором Cleaning Go.');
       return;
     }
     if (!isCompany && !cleanerCodeRequired && hasCode && !referralCode.trim()) {
@@ -193,12 +190,12 @@ export default function SignUp() {
         </Card>
       ) : null}
 
-      {!isCompany && role === 'client' ? <Card>
+      {!isCompany ? <Card>
         <View>
           <Text style={x.codeTitle}>{cleanerCodeRequired ? 'Введите специальный код' : 'У вас есть специальный код?'}</Text>
           <Text style={s.muted}>
             {cleanerCodeRequired
-              ? 'Для регистрации клинера код обязателен. Получите его у компании или администратора Cleaning Go.'
+              ? 'Для регистрации клинера нужен код сообщества, созданного администратором Cleaning Go.'
               : 'Для клиента код необязательный. Промокод компании даёт её бонус после завершённого заказа.'}
           </Text>
         </View>
@@ -214,7 +211,7 @@ export default function SignUp() {
         ) : null}
         {cleanerCodeRequired || hasCode ? (
           <View style={x.codeBox}>
-            <Field label={cleanerCodeRequired ? 'Код клинера *' : 'Специальный код'} value={referralCode} onChangeText={setReferralCode} placeholder="Например, CGC-COMPANY25" autoCapitalize="characters" />
+            <Field label={cleanerCodeRequired ? 'Код сообщества *' : 'Специальный код'} value={referralCode} onChangeText={setReferralCode} placeholder={cleanerCodeRequired ? 'COM-XXXXXXXX' : 'Например, CGC-COMPANY25'} autoCapitalize="characters" />
             <Text style={x.hint}>{cleanerCodeRequired ? 'Без действующего кода регистрация клинера невозможна.' : 'Код можно получить у клининговой компании или пригласившего пользователя.'}</Text>
           </View>
         ) : null}

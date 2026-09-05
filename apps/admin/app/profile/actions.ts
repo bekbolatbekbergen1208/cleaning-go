@@ -13,6 +13,8 @@ export async function confirmCompanyPrice(formData: FormData) {
   const { data: order } = await admin.from('orders').select('id,selected_company_id,total_minor,required_workers,executor_amount_minor,scheduled_at').eq('id', orderId).eq('client_id', user.id).eq('status', 'offered').is('price_confirmed_at', null).maybeSingle();
   if (!order) throw new Error('Предложение цены уже недоступно');
   if (!order.selected_company_id || Number(order.required_workers) < 1 || Number(order.executor_amount_minor) < 0) throw new Error('Компания не указала состав команды');
+  const { data: community } = await admin.from('community_companies').select('community_id').eq('company_id', order.selected_company_id).maybeSingle();
+  if (!community) throw new Error('Компания ещё не вступила в сообщество клинеров');
   const confirmedAt = new Date().toISOString();
   const { error: assignmentError } = await admin.from('order_assignments').insert({
     order_id: order.id,
