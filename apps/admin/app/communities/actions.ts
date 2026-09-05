@@ -32,3 +32,15 @@ export async function toggleCommunity(formData: FormData) {
   if (error) throw new Error(error.message);
   revalidatePath('/communities');
 }
+
+export async function deleteCommunity(formData: FormData) {
+  const id = String(formData.get('id') ?? '');
+  if (!id) throw new Error('Сообщество не найдено');
+
+  const { db } = await getAdminClient();
+  const { error } = await db.from('cleaner_communities').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/communities');
+  revalidatePath('/admin');
+}
