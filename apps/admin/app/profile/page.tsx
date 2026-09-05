@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+/* eslint-disable @next/next/no-img-element -- private signed URLs are short-lived and cannot use the shared image optimizer */
 import Link from 'next/link';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { createClient } from '../../lib/supabase/server';
@@ -55,12 +56,8 @@ export default async function ProfilePage() {
       .reduce((sum, order) => sum + Math.floor(Number(order.executor_amount_minor) / Math.max(1, Number(order.required_workers))), 0);
   }
   const completionPhotos = new Map<string, string[]>();
-  await Promise.all((orders ?? []).map(async order => {
-    const paths = ((order.photo_urls ?? []) as string[]).filter(path => path.includes('/completion-'));
-    if (!paths.length) return;
-    const { data } = await admin.storage.from('order-photos').createSignedUrls(paths, 3600);
-    completionPhotos.set(order.id, (data ?? []).map(item => item.signedUrl).filter((url): url is string => Boolean(url)));
-  }));
+  const completionEntries=(orders??[]).flatMap(order=>((order.photo_urls??[]) as string[]).filter(path=>path.includes('/completion-')).map(path=>({orderId:order.id,path})));
+  if(completionEntries.length){const{data}=await admin.storage.from('order-photos').createSignedUrls(completionEntries.map(item=>item.path),3600);(data??[]).forEach((item,index)=>{if(!item.signedUrl)return;const orderId=completionEntries[index]?.orderId;if(!orderId)return;completionPhotos.set(orderId,[...(completionPhotos.get(orderId)??[]),item.signedUrl]);});}
 
   async function signOut() {
     'use server';
@@ -99,7 +96,7 @@ export default async function ProfilePage() {
           {order.status === 'offered' && order.price_confirmed_at && <p className="mt-2 text-xs font-semibold text-emerald-700">Цена подтверждена. Компания формирует команду.</p>}
           {['created','searching','offered'].includes(order.status) && !order.price_confirmed_at && <CancelOrderButton orderId={order.id}/>}
           {order.status === 'completed_by_cleaner' && <form action={confirmOrderCompletion} className="mt-3"><input type="hidden" name="order_id" value={order.id}/><p className="mb-2 text-sm font-semibold">Клинер завершил уборку. Проверьте результат.</p><button className="button w-full">Подтвердить завершение</button></form>}
-          {Boolean(completionPhotos.get(order.id)?.length) && <div className="mt-3"><p className="mb-2 text-sm font-bold">Фотоотчёт клинера</p><div className="grid grid-cols-2 gap-2">{completionPhotos.get(order.id)?.map((url, index) => <a href={url} target="_blank" rel="noreferrer" key={url}><img className="h-32 w-full rounded-xl object-cover" src={url} alt={`Фотоотчёт ${index + 1}`}/></a>)}</div></div>}
+          {Boolean(completionPhotos.get(order.id)?.length) && <div className="mt-3"><p className="mb-2 text-sm font-bold">Фотоотчёт клинера</p><div className="grid grid-cols-2 gap-2">{completionPhotos.get(order.id)?.map((url, index) => <a href={url} target="_blank" rel="noreferrer" key={url}><img className="h-32 w-full rounded-xl object-cover" src={url} alt={`Фотоотчёт ${index + 1}`} loading="lazy" decoding="async" width="640" height="400"/></a>)}</div></div>}
           {order.status === 'completed' && !order.reviews?.length && <Link className="mt-3 inline-flex text-sm font-bold text-emerald-700" href={`/order/${order.id}/review`}>Оценить уборку →</Link>}
           {order.reviews?.length ? <p className="mt-2 text-xs font-semibold text-emerald-700">Отзыв опубликован</p> : null}
         </div>) : <p className="text-sm text-slate-500">Заказов пока нет.</p>}</div>

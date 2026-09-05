@@ -1,18 +1,12 @@
 @tailwind base; @tailwind components; @tailwind utilities;
 body { @apply bg-slate-50 text-slate-900 antialiased; }
-@layer components { .card { @apply rounded-2xl border border-slate-200 bg-white p-5 shadow-sm; } .button { @apply inline-flex min-h-10 items-center justify-center rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-700 disabled:opacity-50; } .input { @apply w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none focus:border-brand-500; } }
+@layer components { .card { @apply rounded-2xl border border-slate-200 bg-white p-5 shadow-sm; } .button { @apply inline-flex min-h-11 touch-manipulation items-center justify-center rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-700 disabled:opacity-50; } .input { @apply min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none focus:border-brand-500; } }
+
+article.card { content-visibility: auto; contain-intrinsic-size: auto 240px; }
 
 @layer components {
-  .landing-shell { @apply grid gap-8 rounded-[2rem] bg-white p-3 shadow-sm ring-1 ring-slate-200 lg:grid-cols-[0.95fr_1.05fr] lg:p-5; }
-  .landing-card { @apply relative min-h-[620px] overflow-hidden rounded-[1.65rem] bg-[#073f36] p-8 text-white sm:p-10; }
-  .landing-orb { @apply pointer-events-none absolute rounded-full bg-emerald-600/25; }
-  .landing-orb-one { width: 360px; height: 360px; right: -145px; top: -150px; }
-  .landing-orb-two { width: 250px; height: 250px; left: -140px; top: 145px; }
   .landing-primary { @apply flex min-h-12 items-center justify-center rounded-xl bg-emerald-500 px-5 font-extrabold text-white transition hover:bg-emerald-400; }
   .landing-secondary { @apply flex min-h-12 items-center justify-center rounded-xl bg-white px-5 font-extrabold text-slate-900 transition hover:bg-slate-100; }
-  .landing-copy { @apply flex flex-col justify-center px-5 py-10 sm:px-10 lg:px-12; }
-  .feature-icon { @apply grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-50 text-xl font-black text-emerald-700; }
-  .avatar { @apply grid h-9 w-9 place-items-center rounded-full border-2 border-[#073f36] text-xs font-black text-slate-800; }
 }
 
 .site-header { position: sticky; top: 0; z-index: 40; background: rgba(255,255,255,.92); backdrop-filter: blur(16px); }
@@ -64,6 +58,7 @@ body { @apply bg-slate-50 text-slate-900 antialiased; }
 
 @media (max-width: 640px) {
   body { background: #fff; }
+  .site-header, .mobile-tabbar { background: #fff; backdrop-filter: none; }
   .site-header > div { min-height: 58px; padding: 10px 16px; }
   .desktop-public-nav { display: none; }
   .mobile-register-button { display: inline-flex; min-height: 38px; align-items: center; border-radius: 11px; background: #087562; padding: 0 14px; color: white; font-size: 13px; font-weight: 800; }
@@ -79,10 +74,6 @@ body { @apply bg-slate-50 text-slate-900 antialiased; }
   .mobile-tabbar a.active { color: #087562; }
   .mobile-tabbar .tab-order-icon { display: grid; width: 32px; height: 32px; margin-top: -15px; place-items: center; border: 4px solid white; border-radius: 50%; background: #087562; color: white; font-size: 21px; box-sizing: content-box; box-shadow: 0 5px 14px rgba(8,117,98,.3); }
   .card { border-radius: 18px; box-shadow: none; }
-  .landing-shell { display: block; padding: 0; border: 0; border-radius: 0; box-shadow: none; }
-  .landing-card { min-height: calc(100svh - 140px); border-radius: 0 0 28px 28px; padding: 28px 20px; }
-  .landing-card h1 { font-size: 44px; }
-  .landing-copy { padding: 38px 20px; }
   .public-home { gap: 42px; padding-bottom: 20px; }
   .home-hero { display: block; min-height: auto; border-radius: 0 0 28px 28px; }
   .home-hero-copy { padding: 36px 20px 32px; }
@@ -122,4 +113,8 @@ body { @apply bg-slate-50 text-slate-900 antialiased; }
   .company-mobile-shell article form { width: 100%; }
   .company-mobile-shell article form button { width: 100%; }
   .company-mobile-shell .tracking-wider { letter-spacing: .08em; overflow-wrap: anywhere; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }

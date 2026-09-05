@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @next/next/no-html-link-for-pages -- hash links scroll within the landing page */
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
