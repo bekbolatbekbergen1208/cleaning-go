@@ -1,6 +1,6 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { bodyIsTooLarge, clientIp, hasJsonContentType, isRateLimited, isSameOriginRequest } from '../../../../lib/request-security';
+import { bodyIsTooLarge, clientIp, hasJsonContentType, isRateLimited, isSameOriginRequest, readJsonBody } from '../../../../lib/request-security';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   if (isRateLimited(`login:${clientIp(request)}`, 10, 15 * 60 * 1000)) {
     return NextResponse.json({ error: 'Слишком много попыток входа. Попробуйте через 15 минут.' }, { status: 429 });
   }
-  const body = await request.json().catch(() => null) as { email?: string; password?: string } | null;
+  const body = await readJsonBody<{ email?: string; password?: string }>(request);
   const email = body?.email?.trim().toLowerCase().slice(0, 254);
   const password = body?.password;
 

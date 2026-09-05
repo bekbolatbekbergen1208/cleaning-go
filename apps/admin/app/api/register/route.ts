@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
-import { bodyIsTooLarge, hasJsonContentType } from '../../../lib/request-security';
+import { bodyIsTooLarge, clientIp, hasJsonContentType, isRateLimited, readJsonBody } from '../../../lib/request-security';
 
 const roles = new Set(['client', 'cleaner', 'company_owner']);
 
@@ -19,9 +19,13 @@ export async function POST(request: NextRequest) {
   const headers = corsHeaders(request);
   if (!headers) return NextResponse.json({ error: 'Origin is not allowed' }, { status: 403 });
   if (!hasJsonContentType(request) || bodyIsTooLarge(request)) return NextResponse.json({ error: 'Некорректный запрос.' }, { status: 400, headers });
+  if (isRateLimited(`register:${clientIp(request)}`, 5, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: 'Слишком много регистраций. Попробуйте позже.' }, { status: 429, headers });
+  }
 
   try {
-    const body = await request.json();
+    const body = await readJsonBody<Record<string, unknown>>(request);
+    if (!body) return NextResponse.json({ error: 'Некорректный запрос.' }, { status: 400, headers });
     const email = String(body.email ?? '').trim().toLowerCase().slice(0, 254);
     const password = String(body.password ?? '');
     const role = String(body.role ?? '');

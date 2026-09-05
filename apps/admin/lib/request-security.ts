@@ -32,6 +32,16 @@ export function bodyIsTooLarge(request: NextRequest, maxBytes = 32_768) {
   return Number.isFinite(length) && length > maxBytes;
 }
 
+export async function readJsonBody<T>(request: NextRequest, maxBytes = 32_768): Promise<T | null> {
+  const raw = await request.text();
+  if (new TextEncoder().encode(raw).byteLength > maxBytes) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
 export function isSameOriginRequest(request: NextRequest) {
   if (request.headers.get('sec-fetch-site') === 'cross-site') return false;
   const origin = request.headers.get('origin');
