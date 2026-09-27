@@ -118,3 +118,51 @@ article.card { content-visibility: auto; contain-intrinsic-size: auto 240px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+/* Motion enhances the existing layout; no additional animation dependency. */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  .home-hero-copy > * { animation: home-arrive .7s cubic-bezier(.22,1,.36,1) both; }
+  .home-hero-copy > :nth-child(2) { animation-delay: .08s; }
+  .home-hero-copy > :nth-child(3) { animation-delay: .16s; }
+  .home-hero-copy > :nth-child(4) { animation-delay: .24s; }
+  .home-hero-copy > :nth-child(5) { animation-delay: .32s; }
+  .clean-house { animation: home-float 4.8s ease-in-out; }
+  .clean-bubble-one { animation: bubble-drift 4.4s ease-in-out; }
+  .clean-bubble-two { animation: bubble-drift 4.8s ease-in-out reverse; }
+  .home-hero-visual::before { animation: halo-arrive 1.2s ease-out both; }
+  .button, .landing-primary, .landing-secondary, .header-order-button,
+  .mobile-register-button { transition: transform .2s ease, box-shadow .2s ease, background-color .2s ease; }
+  .button:active:not(:disabled), .landing-primary:active, .landing-secondary:active,
+  .header-order-button:active, .mobile-register-button:active { transform: scale(.97); }
+  .service-symbol, .service-tile i, .home-actions a span,
+  .mobile-tabbar a > span { transition: transform .3s cubic-bezier(.22,1,.36,1); }
+  .mobile-tabbar a:active > span { transform: scale(.88); }
+  .input { transition: border-color .2s ease, box-shadow .2s ease; }
+  @media (hover: hover) and (pointer: fine) {
+    .landing-primary:hover, .header-order-button:hover, .button:hover:not(:disabled) {
+      transform: translateY(-2px); box-shadow: 0 8px 22px rgba(8,117,98,.2);
+    }
+    .service-tile:hover .service-symbol { transform: translateY(-3px) rotate(-5deg); }
+    .service-tile:hover i, .home-actions a:hover span { transform: translateX(4px); }
+    .clean-house:hover { transform: translateY(-7px) rotate(0); transition: transform .4s ease; }
+  }
+}
+.input:focus-visible { box-shadow: 0 0 0 3px rgba(15,157,134,.14); }
+a:focus-visible, button:focus-visible { outline: 3px solid #0f9d86; outline-offset: 4px; }
+@keyframes home-arrive {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes home-float {
+  0%, 100% { transform: translateY(0) rotate(3deg); }
+  50% { transform: translateY(-14px) rotate(0deg); }
+}
+@keyframes bubble-drift {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -14px; }
+}
+@keyframes halo-arrive {
+  from { opacity: 0; transform: scale(.88); }
+  to { opacity: 1; transform: scale(1); }
+}

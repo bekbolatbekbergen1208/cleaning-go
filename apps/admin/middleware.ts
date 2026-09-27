@@ -18,18 +18,21 @@ function secure(response: NextResponse) {
 }
 
 export async function middleware(request: NextRequest) {
-  if (publicPaths.has(request.nextUrl.pathname)) return secure(NextResponse.next());
+  // Authentication endpoints manage their own session cookies.
+  if (['/api/auth/login', '/api/register'].includes(request.nextUrl.pathname)) return secure(NextResponse.next());
 
   let response = NextResponse.next({ request });
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)!,
     { cookies: { getAll: () => request.cookies.getAll(), setAll(items: CookieToSet[]) { items.forEach(({ name, value }) => request.cookies.set(name, value)); response = NextResponse.next({ request }); items.forEach(({ name, value, options }) => response.cookies.set(name, value, options)); } } },
   );
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  if (!user && !publicPaths.has(request.nextUrl.pathname)) {
     const isAdminPath = adminPaths.some((path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(`${path}/`));
-    return secure(NextResponse.redirect(new URL(isAdminPath ? '/admin/login' : '/login', request.url)));
+    const redirectResponse = NextResponse.redirect(new URL(isAdminPath ? '/admin/login' : '/login', request.url));
+    response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));
+    return secure(redirectResponse);
   }
   return secure(response);
 }
