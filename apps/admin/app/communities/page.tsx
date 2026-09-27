@@ -17,7 +17,7 @@ export default async function CommunitiesPage() {
 
   return <>
     <h1 className="text-3xl font-black">Сообщества клинеров</h1>
-    <p className="mt-2 text-slate-500">Создайте сообщество и передайте его код компаниям и клинерам.</p>
+    <p className="mt-2 text-slate-500">Сообщество создаёт администратор. Компании и клинеры вступают по его коду. Клинеры общие внутри сообщества, а клиенты закреплены за отдельными компаниями.</p>
     <form action={createCommunity} className="card mt-6 grid gap-3 sm:grid-cols-2">
       <label className="text-sm font-bold">Название<input className="input mt-1" name="name" required minLength={2}/></label>
       <label className="text-sm font-bold">Описание<input className="input mt-1" name="description"/></label>

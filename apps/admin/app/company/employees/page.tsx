@@ -1,15 +1,58 @@
-import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { createClient } from '../../../lib/supabase/server';
 
-type Employee = { id:string; cleaner_id:string; is_active:boolean; created_at:string; profiles:{full_name?:string;phone?:string;email?:string}|null };
+type Member = { cleaner_id: string; profiles: { full_name: string; status: string } | null };
 
-export default async function CompanyEmployeesPage() {
-  const supabase=await createClient(); const {data:{user}}=await supabase.auth.getUser(); if(!user) redirect('/login');
-  const {data:company}=await supabase.from('company_profiles').select('id,name,company_code').eq('owner_id',user.id).maybeSingle(); if(!company) redirect('/');
-  const {data}=await supabase.from('company_cleaners').select('id,cleaner_id,is_active,created_at,profiles!cleaner_id(full_name,phone,email)').eq('company_id',company.id).order('created_at',{ascending:false});
-  const employees=(data??[]) as unknown as Employee[];
-  async function toggleEmployee(formData:FormData) { 'use server'; const server=await createClient(); const {data:{user:current}}=await server.auth.getUser(); if(!current) redirect('/login'); const id=String(formData.get('employee_id')); const active=formData.get('active')==='true'; const {data:owned}=await server.from('company_profiles').select('id').eq('owner_id',current.id).maybeSingle(); if(!owned) redirect('/'); const {error}=await server.from('company_cleaners').update({is_active:active}).eq('id',id).eq('company_id',owned.id); if(error) throw new Error(error.message); revalidatePath('/company/employees'); }
-  return <div className="mx-auto max-w-3xl px-4 py-10"><Link className="text-sm font-bold text-emerald-700" href="/company">← Кабинет компании</Link><div className="mt-5 flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-3xl font-black">Сотрудники</h1><p className="mt-2 text-sm text-slate-500">Передайте клинеру код компании: <b>{company.company_code}</b></p></div><div className="rounded-2xl bg-emerald-50 px-5 py-3 text-center"><b className="text-2xl text-emerald-800">{employees.filter(x=>x.is_active).length}</b><p className="text-xs text-emerald-700">активных</p></div></div><div className="mt-6 space-y-3">{employees.length?employees.map(employee=><article className="card flex flex-wrap items-center gap-4" key={employee.id}><div className="grid h-12 w-12 place-items-center rounded-full bg-emerald-100 font-black text-emerald-800">{(employee.profiles?.full_name??'С').slice(0,1)}</div><div className="min-w-0 flex-1"><h2 className="font-black">{employee.profiles?.full_name??'Сотрудник'}</h2><p className="truncate text-sm text-slate-500">{employee.profiles?.phone??employee.profiles?.email??'Контакт не указан'}</p></div><form action={toggleEmployee}><input type="hidden" name="employee_id" value={employee.id}/><input type="hidden" name="active" value={employee.is_active?'false':'true'}/><button className={employee.is_active?'rounded-xl border border-red-200 px-4 py-2 font-semibold text-red-600':'button'}>{employee.is_active?'Отключить':'Включить'}</button></form></article>):<div className="card text-center"><b>Сотрудников пока нет</b><p className="mt-2 text-sm text-slate-500">Клинер должен зарегистрироваться с кодом {company.company_code}.</p></div>}</div></div>;
+export default async function CompanyCleanersPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+  const { data: profile } = await supabase.from('profiles').select('role,status').eq('id', user.id).single();
+  if (profile?.role !== 'company_owner' || profile.status !== 'active') redirect('/profile');
+  const admin = createAdminClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: company, error: companyError } = await admin.from('company_profiles').select('id').eq('owner_id', user.id).single();
+  if (companyError || !company) throw new Error('Не удалось загрузить компанию');
+  const { data: membership, error: membershipError } = await admin.from('community_companies')
+    .select('community_id,cleaner_communities(name,code,is_active)').eq('company_id', company.id).maybeSingle();
+  if (membershipError) throw new Error('Не удалось загрузить сообщество');
+  const community = membership?.cleaner_communities as unknown as { name: string; code: string; is_active: boolean } | null;
+  let members: Member[] = [];
+  let cleaners: { user_id: string; verification_status: string; is_available: boolean }[] = [];
+  if (membership) {
+    const { data, error } = await admin.from('community_cleaners')
+      .select('cleaner_id,profiles!cleaner_id(full_name,status)').eq('community_id', membership.community_id).order('joined_at');
+    if (error) throw new Error('Не удалось загрузить клинеров сообщества');
+    members = (data ?? []) as unknown as Member[];
+    if (members.length) {
+      const { data: details, error: detailsError } = await admin.from('cleaner_profiles')
+        .select('user_id,verification_status,is_available').in('user_id', members.map(member => member.cleaner_id));
+      if (detailsError) throw new Error('Не удалось загрузить статусы клинеров');
+      cleaners = details ?? [];
+    }
+  }
+  const byId = new Map(cleaners.map(cleaner => [cleaner.user_id, cleaner]));
+  return <div className="mx-auto max-w-3xl px-4 py-10">
+    <Link className="text-sm font-bold text-emerald-700" href="/company">← Кабинет компании</Link>
+    <h1 className="mt-5 text-3xl font-black">Клинеры сообщества</h1>
+    <p className="mt-2 text-sm text-slate-500">Клинеры общие для всех компаний вашего сообщества. Клиенты и их заказы остаются у своей компании.</p>
+    {community ? <>
+      <section className="card mt-6"><h2 className="text-xl font-black">{community.name}</h2>
+        <p className="mt-2 text-sm">Код приглашения клинера: <b>{community.code}</b></p>
+        <p className="mt-2 text-sm text-slate-500">Участников: {members.length}. Состав сообщества управляется на уровне платформы.</p>
+        {!community.is_active && <p className="mt-3 text-amber-700">Сообщество отключено. Новые заказы недоступны для взятия.</p>}
+      </section>
+      <div className="mt-6 space-y-3">{members.length ? members.map(member => {
+        const cleaner = byId.get(member.cleaner_id);
+        const available = community.is_active && member.profiles?.status === 'active' && cleaner?.verification_status === 'approved' && cleaner.is_available;
+        return <article className="card flex items-center justify-between gap-4" key={member.cleaner_id}>
+          <h2 className="font-bold">{member.profiles?.full_name ?? 'Клинер'}</h2>
+          <span className={`rounded-full px-3 py-1 text-xs font-bold ${available ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{available ? 'Доступен' : 'Недоступен'}</span>
+        </article>;
+      }) : <p className="card text-slate-500">Клинеров пока нет. Передайте клинеру код сообщества для регистрации.</p>}</div>
+    </> : <section className="card mt-6"><p>Компания пока не состоит в сообществе. Получите код у администратора и введите его в кабинете компании.</p><Link href="/company" className="button mt-4">Вступить в сообщество</Link></section>}
+  </div>;
 }

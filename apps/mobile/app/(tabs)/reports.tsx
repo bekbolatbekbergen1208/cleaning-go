@@ -18,6 +18,7 @@ type ReportOrder = {
 };
 
 export default function Reports() {
+  const profileId = useSessionStore((state) => state.profile?.id);
   const role = useSessionStore((state) => state.profile?.role);
   const demoOrders = useSessionStore((state) => state.demoOrders);
   const demo = process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
@@ -37,14 +38,15 @@ export default function Reports() {
     setLoading(true);
     void supabase.from('orders').select('id,client_id,status,total_minor,executor_amount_minor,company_cashback_minor,created_at,completed_at').order('created_at', { ascending: false }).then(async ({ data }) => {
       setOrders((data ?? []) as ReportOrder[]);
-      const { data: company } = await supabase.from('company_profiles').select('id').single();
+      const { data: company } = await supabase.from('company_profiles').select('id').eq('owner_id', profileId!).single();
       if (company) {
-        const { count } = await supabase.from('company_cleaners').select('id', { count: 'exact', head: true }).eq('company_id', company.id).eq('is_active', true);
+        const { data: membership } = await supabase.from('community_companies').select('community_id').eq('company_id', company.id).maybeSingle();
+        const { count } = membership ? await supabase.from('community_cleaners').select('cleaner_id', { count: 'exact', head: true }).eq('community_id', membership.community_id) : { count: 0 };
         setEmployees(count ?? 0);
       }
       setLoading(false);
     });
-  }, [demo, demoOrders, role]));
+  }, [demo, demoOrders, role, profileId]));
 
   const filtered = useMemo(() => {
     if (!period) return orders;
@@ -96,7 +98,7 @@ export default function Reports() {
           <Text style={s.cardTitle}>Эффективность</Text>
           <View style={x.line}><Text style={s.muted}>Выполнено заказов</Text><Text style={x.value}>{report.completionRate}%</Text></View>
           <View style={x.line}><Text style={s.muted}>Отменено</Text><Text style={x.value}>{report.cancelled}</Text></View>
-          <View style={x.line}><Text style={s.muted}>Сотрудников в команде</Text><Text style={x.value}>{employees}</Text></View>
+          <View style={x.line}><Text style={s.muted}>Клинеров в сообществе</Text><Text style={x.value}>{employees}</Text></View>
         </Card>
         {!filtered.length ? <EmptyState title="За выбранный период данных нет" body="Когда появятся заказы, отчёт сформируется автоматически." /> : null}
       </>}

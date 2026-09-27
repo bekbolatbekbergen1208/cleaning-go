@@ -91,3 +91,14 @@ export async function cancelOrder(formData: FormData) {
   revalidatePath('/profile');
   revalidatePath('/company/orders');
 }
+
+export async function joinCleanerCommunity(_previous: string, formData: FormData): Promise<string> {
+  const code = String(formData.get('community_code') ?? '').trim().toUpperCase();
+  if (code.length < 4 || code.length > 32) return 'Проверьте код сообщества.';
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('join_cleaner_community', { community_code: code });
+  if (error) return 'Не удалось вступить. Проверьте код и активность сообщества у администратора.';
+  revalidatePath('/profile');
+  revalidatePath('/company/employees');
+  return 'Вы вступили в сообщество.';
+}
