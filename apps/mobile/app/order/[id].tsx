@@ -13,8 +13,8 @@ const next: Partial<Record<OrderStatus, { status: OrderStatus; label: string }>>
   arrived: { status: 'in_progress', label: 'Начать уборку' }, in_progress: { status: 'completed_by_cleaner', label: 'Уборка завершена' },
   completed_by_cleaner: { status: 'completed', label: 'Подтвердить завершение' },
 };
-const trackingStatuses: OrderStatus[] = ['on_the_way', 'arrived', 'in_progress'];
-type Point = { latitude: number; longitude: number; recorded_at: string };
+const trackingStatuses: OrderStatus[] = ['accepted', 'on_the_way', 'arrived', 'in_progress'];
+type Point = { cleaner_id: string; latitude: number; longitude: number; recorded_at: string };
 
 export default function OrderDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -23,7 +23,7 @@ export default function OrderDetail() {
   const updateDemo = useSessionStore(state => state.updateDemoOrderStatus);
   const demo = process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
   const [order, setOrder] = useState<Order | undefined>(demo ? demoOrders.find(item => item.id === id) : undefined);
-  const [point, setPoint] = useState<Point>(); const [rating, setRating] = useState('5'); const [review, setReview] = useState('');
+  const [points, setPoints] = useState<Point[]>([]); const [rating, setRating] = useState('5'); const [review, setReview] = useState('');
   const executor = role === 'cleaner' || role === 'company_cleaner' || role === 'company_owner';
   const isCleaner = role === 'cleaner' || role === 'company_cleaner';
 
@@ -33,12 +33,17 @@ export default function OrderDetail() {
     if (error) Alert.alert('Ошибка', error.message); else setOrder(data as Order);
   }
 
+  async function loadPoints() {
+    const { data } = await supabase.from('cleaner_locations').select('cleaner_id,latitude,longitude,recorded_at').eq('order_id', id);
+    setPoints((data ?? []) as Point[]);
+  }
+
   useEffect(() => {
     void load(); if (demo) return;
     const channel = supabase.channel(`order-${id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${id}` }, payload => setOrder(payload.new as Order))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cleaner_locations', filter: `order_id=eq.${id}` }, payload => setPoint(payload.new as Point)).subscribe();
-    void supabase.from('cleaner_locations').select('latitude,longitude,recorded_at').eq('order_id', id).maybeSingle().then(({ data }) => data && setPoint(data));
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cleaner_locations', filter: `order_id=eq.${id}` }, () => void loadPoints()).subscribe();
+    void loadPoints();
     return () => { void supabase.removeChannel(channel); };
   }, [id, demo, demoOrders]);
 
@@ -77,7 +82,7 @@ export default function OrderDetail() {
   const action = next[order.status]; const showAction = action && ((executor && action.status !== 'completed') || (!executor && action.status === 'completed'));
   return <Screen><Title subtitle={`Статус: ${order.status}`}>№ {order.order_number}</Title>
     <Card><Text style={s.cardTitle}>{order.address_text}</Text><Text>{new Date(order.scheduled_at).toLocaleString('ru-KZ')}</Text><Text>{order.area_sq_m} м² · {order.rooms_count} комн.</Text><Text style={s.cardTitle}>{formatMoney(order.total_minor)}</Text></Card>
-    {point ? <Card><Text style={s.cardTitle}>Клинер на карте 2GIS</Text><TwoGisMap latitude={point.latitude} longitude={point.longitude} /><Text style={s.muted}>Обновлено {new Date(point.recorded_at).toLocaleTimeString('ru-KZ')}</Text><Button title="Открыть в 2GIS" variant="secondary" onPress={() => void Linking.openURL(`https://2gis.kz/search/${point.latitude},${point.longitude}`)} /></Card> : trackingStatuses.includes(order.status) ? <Card><Text>Ожидаем первую точку геолокции…</Text></Card> : null}
+    {trackingStatuses.includes(order.status) && points.length ? points.map(point => <Card key={point.cleaner_id}><Text style={s.cardTitle}>Клинер на карте 2GIS</Text><TwoGisMap latitude={point.latitude} longitude={point.longitude} /><Text style={s.muted}>Обновлено {new Date(point.recorded_at).toLocaleTimeString('ru-KZ')}</Text><Button title="Открыть в 2GIS" variant="secondary" onPress={() => void Linking.openURL(`https://2gis.kz/search/${point.latitude},${point.longitude}`)} /></Card>) : trackingStatuses.includes(order.status) ? <Card><Text>Ожидаем первую точку геолокции…</Text></Card> : null}
     {showAction ? <Button title={action.label} onPress={() => void transition(action.status)} /> : null}
     {!executor && ['created', 'searching'].includes(order.status) ? <Button title="Отменить заказ" variant="danger" onPress={() => void transition('cancelled')} /> : null}
     {!executor && order.status === 'completed' ? <Card><Text style={s.cardTitle}>Оцените уборку</Text><View style={s.row}>{[1,2,3,4,5].map(value => <Button key={value} title={String(value)} variant={rating === String(value) ? 'primary' : 'secondary'} onPress={() => setRating(String(value))} />)}</View><Field label="Отзыв" value={review} onChangeText={setReview} /><Button title="Опубликовать отзыв" onPress={() => void sendReview()} /></Card> : null}

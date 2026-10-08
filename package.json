@@ -9,9 +9,11 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r --if-present test",
     "lint": "pnpm -r --if-present lint",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:tracking": "node --test scripts/tests/*.test.mjs"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.3.14",
     "@supabase/supabase-js": "^2.53.0",
     "postgres": "^3.4.7",
     "prettier": "^3.6.2",

@@ -2,6 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { AddressPicker } from '../../../components/maps/address-picker';
+import type { MapPoint } from '../../../components/maps/astana-map';
+import { isAstana } from '../../../lib/map-coordinates';
 import { createClient } from '../../../lib/supabase/client';
 
 type Service = { id: string; name: string; description: string | null; base_price_minor: number };
@@ -17,6 +20,7 @@ export function OrderForm({ services, companies, preferredCompanyId, companyLock
   const router = useRouter();
   const approvedCompanies = companies.filter((company) => company.verification_status === 'approved');
   const cityOptions = [...new Set(approvedCompanies.flatMap((company) => company.service_cities).map((item) => item.trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
+  const [mapPoint, setMapPoint] = useState<MapPoint | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -41,6 +45,7 @@ export function OrderForm({ services, companies, preferredCompanyId, companyLock
     setError('');
     setSuccess('');
     const form = new FormData(formElement);
+    if (isAstana(city) && !mapPoint) { setError('Отметьте адрес уборки на карте Астаны.'); setBusy(false); return; }
     const photo = form.get('photo');
     const scheduledAt = new Date(String(form.get('scheduled_at')));
     if (!(photo instanceof File) || photo.size === 0) { setError('Добавьте фотографию помещения.'); setBusy(false); return; }
@@ -56,6 +61,8 @@ export function OrderForm({ services, companies, preferredCompanyId, companyLock
     const { data: address, error: addressError } = await supabase.from('addresses').insert({
       user_id: user.id,
       label: 'Заказ',
+      latitude: isAstana(city) ? mapPoint?.latitude : null,
+      longitude: isAstana(city) ? mapPoint?.longitude : null,
       city: String(form.get('city')).trim(),
       address_line: String(form.get('address')).trim(),
     }).select('id').single();
@@ -82,6 +89,7 @@ export function OrderForm({ services, companies, preferredCompanyId, companyLock
     setSuccess(`Заказ ${order.order_number} создан. Компания скоро подтвердит цену.`);
     setBusy(false);
     formElement.reset();
+    setMapPoint(null);
   }
 
   return <form className="card mt-6 space-y-6 sm:p-7" onSubmit={submit}>
@@ -89,7 +97,7 @@ export function OrderForm({ services, companies, preferredCompanyId, companyLock
     <div className="rounded-2xl bg-slate-50 p-4 sm:p-5"><p className="mb-4 text-lg font-black">Что и где убрать</p>
     <label className="block"><span className="text-sm font-semibold">Вид уборки</span><select className="input mt-1" name="service_id" value={serviceId} onChange={(event)=>setServiceId(event.target.value)} required>{services.map((service) => <option key={service.id} value={service.id}>{service.name} — от {(service.base_price_minor/100).toLocaleString('ru-RU')} ₸</option>)}</select></label>
     {selectedService&&<div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Примерная стоимость</p><p className="mt-1 text-2xl font-black text-emerald-900">от {estimatedPrice.toLocaleString('ru-RU')} ₸</p>{selectedService.description&&<p className="mt-1 text-sm text-emerald-800">{selectedService.description}</p>}<p className="mt-2 text-xs text-slate-500">Это ориентир. Компания подтвердит точную цену после просмотра фото, площади и деталей заказа.</p></div>}
-    <div className="mt-4 grid gap-4 sm:grid-cols-2"><label><span className="text-sm font-semibold">Город</span><select className="input mt-1" name="city" value={city} onChange={(event) => setCity(event.target.value)} required>{cityOptions.map(item=><option key={item}>{item}</option>)}</select></label><label><span className="text-sm font-semibold">Адрес</span><input className="input mt-1" name="address" placeholder="Улица, дом, квартира" required /></label></div></div>
+    <div className="mt-4 grid gap-4 sm:grid-cols-2"><label><span className="text-sm font-semibold">Город</span><select className="input mt-1" name="city" value={city} onChange={(event) => { setCity(event.target.value); setMapPoint(null); }} required>{cityOptions.map(item=><option key={item}>{item}</option>)}</select></label><label><span className="text-sm font-semibold">Адрес</span><input className="input mt-1" name="address" placeholder="Улица, дом, квартира" required /></label></div>{isAstana(city) && <AddressPicker value={mapPoint} onChange={setMapPoint} />}</div>
     <section><h2 className="text-lg font-black">Кто выполнит уборку</h2>{companyLocked ? lockedCompany ? <div className="mt-2 rounded-2xl border-2 border-emerald-500 bg-emerald-50 p-4"><b className="text-lg">{lockedCompany.name}</b><p className="mt-1 text-sm text-emerald-800">★ {Number(lockedCompany.rating).toFixed(1)} · {lockedCompany.reviews_count} отзывов</p><p className="mt-2 text-xs text-slate-500">Закреплена специальным кодом. Заказ автоматически отправится этой компании.</p></div> : <div className="mt-2 rounded-2xl bg-red-50 p-4 text-sm text-red-700"><b>{unavailableLockedCompany?.name ?? 'Закреплённая компания'}</b><p className="mt-1">{unavailableLockedCompany ? `Текущий статус: ${unavailableLockedCompany.verification_status}. Администратор должен одобрить компанию.` : 'Данные компании недоступны. Обратитесь к администратору.'}</p></div> : <><p className="mt-1 text-xs text-slate-500">Компании в городе «{city}» отсортированы по рейтингу.</p><div className="mt-3 grid gap-3 sm:grid-cols-2">{availableCompanies.map(company=><button type="button" key={company.id} onClick={()=>setCompanyId(company.id)} className={`rounded-2xl border-2 p-4 text-left transition ${selectedCompanyId===company.id?'border-emerald-500 bg-emerald-50 shadow-sm':'border-slate-200 bg-white hover:border-emerald-200'}`}><div className="flex items-start justify-between gap-2"><b className="block text-lg">{company.name}</b>{selectedCompanyId===company.id&&<span className="rounded-full bg-emerald-600 px-2 py-1 text-xs text-white">Выбрано</span>}</div><span className="mt-2 block text-sm font-bold text-amber-600">★ {Number(company.rating).toFixed(1)}</span><span className="text-xs text-slate-500">{company.reviews_count} отзывов</span></button>)}</div>{!availableCompanies.length&&<p className="mt-2 rounded-xl bg-red-50 p-3 font-semibold text-red-600">В этом городе пока нет доступных компаний.</p>}</>}</section>
     {bonusBalances && <label className="block"><span className="text-sm font-semibold">Использовать бонусы</span><input className="input mt-1" type="number" min="0" max={availableBonusMinor / 100} step="1" value={bonusKzt} onChange={(event) => setBonusKzt(Number(event.target.value))} /><small className="mt-1 block text-slate-500">Доступно у выбранной компании: {(availableBonusMinor / 100).toLocaleString('ru-RU')} ₸. Списание произойдёт после подтверждения цены.</small></label>}
     <label className="block"><span className="text-sm font-semibold">Дата и время</span><input className="input mt-1" type="datetime-local" name="scheduled_at" required /></label>

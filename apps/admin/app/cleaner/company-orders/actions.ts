@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { createClient } from '../../../lib/supabase/server';
 
@@ -11,10 +12,11 @@ export async function claimCompanyOrder(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Сначала войдите в аккаунт');
 
-  const { error } = await supabase.rpc('claim_company_order', { target_order_id: orderId });
+  const { data: order, error } = await supabase.rpc('claim_company_order', { target_order_id: orderId });
   if (error) throw new Error(error.message);
   revalidatePath('/cleaner/company-orders');
   revalidatePath('/company/orders');
+  if (['астана', 'astana', 'нур-султан'].includes(order?.city?.trim().toLowerCase())) redirect(`/order/${orderId}/tracking`);
 }
 
 const nextStatuses: Record<string, string> = {

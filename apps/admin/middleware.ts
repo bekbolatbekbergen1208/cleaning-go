@@ -28,6 +28,11 @@ export async function middleware(request: NextRequest) {
     { cookies: { getAll: () => request.cookies.getAll(), setAll(items: CookieToSet[]) { items.forEach(({ name, value }) => request.cookies.set(name, value)); response = NextResponse.next({ request }); items.forEach(({ name, value, options }) => response.cookies.set(name, value, options)); } } },
   );
   const { data: { user } } = await supabase.auth.getUser();
+  if (!user && request.nextUrl.pathname.startsWith('/api/orders/')) {
+    const unauthorized = NextResponse.json({ error: 'Сначала войдите в аккаунт' }, { status: 401 });
+    response.cookies.getAll().forEach(cookie => unauthorized.cookies.set(cookie));
+    return secure(unauthorized);
+  }
   if (!user && !publicPaths.has(request.nextUrl.pathname)) {
     const isAdminPath = adminPaths.some((path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(`${path}/`));
     const redirectResponse = NextResponse.redirect(new URL(isAdminPath ? '/admin/login' : '/login', request.url));
