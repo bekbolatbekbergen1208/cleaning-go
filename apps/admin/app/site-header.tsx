@@ -2,27 +2,193 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- hash links scroll within the landing page */
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { Icon } from '../components/icon';
+
+const adminLinks = [
+  ['/admin', 'Обзор'],
+  ['/verifications', 'Проверки'],
+  ['/orders', 'Заказы'],
+  ['/users', 'Люди'],
+  ['/services', 'Услуги'],
+  ['/moderation', 'Модерация'],
+  ['/settings', 'Настройки'],
+  ['/communities', 'Сообщества'],
+] as const;
+const companyLinks = [
+  ['/company', 'Кабинет'],
+  ['/company/sales', 'Продажи'],
+  ['/company/employees', 'Клинеры'],
+  ['/company/cities', 'Города'],
+  ['/company/orders', 'Заказы'],
+] as const;
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
   const isAdminLogin = pathname === '/admin/login';
-  const isAdmin = !isAdminLogin && ['/admin', '/companies', '/communities', '/orders', '/verifications', '/users', '/services', '/moderation', '/settings'].some((path) => pathname === path || pathname.startsWith(`${path}/`));
+  const isAdmin =
+    !isAdminLogin &&
+    [
+      '/admin',
+      '/companies',
+      '/communities',
+      '/orders',
+      '/verifications',
+      '/users',
+      '/services',
+      '/moderation',
+      '/settings',
+    ].some((path) => pathname === path || pathname.startsWith(`${path}/`));
   const isCompany = pathname === '/company' || pathname.startsWith('/company/');
+  const isAuth =
+    pathname === '/login' || pathname === '/register' || isAdminLogin;
+  useEffect(() => setMenuOpen(false), [pathname]);
+  const active = (href: string) =>
+    pathname === href ||
+    (href !== '/' && href !== '/company' && pathname.startsWith(`${href}/`));
+  const tabs: {
+    href: string;
+    label: string;
+    icon: Parameters<typeof Icon>[0]['name'];
+    primary?: boolean;
+  }[] = isCompany
+    ? [
+        { href: '/company', label: 'Кабинет', icon: 'home' },
+        { href: '/company/orders', label: 'Заказы', icon: 'orders' },
+        { href: '/company/sales', label: 'Продажи', icon: 'chart' },
+        { href: '/company/employees', label: 'Клинеры', icon: 'people' },
+      ]
+    : [
+        { href: '/', label: 'Главная', icon: 'home' },
+        { href: '/#services', label: 'Услуги', icon: 'sparkle' },
+        { href: '/order/new', label: 'Заказать', icon: 'plus', primary: true },
+        { href: '/profile', label: 'Профиль', icon: 'user' },
+      ];
 
-  return <><header className="site-header border-b bg-white">
-    <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
-      <Link href={isAdmin ? '/admin' : isCompany ? '/company' : '/'} className="text-xl font-black text-brand-700">Cleaning Go{isAdmin ? ' · Admin' : isCompany ? ' · Компания' : ''}</Link>
-      {isAdmin ? <nav className="flex flex-wrap justify-end gap-x-4 gap-y-2 text-sm"><Link href="/admin">Обзор</Link><Link href="/verifications">Проверки</Link><Link href="/orders">Заказы</Link><Link href="/users">Люди</Link><Link href="/services">Услуги</Link><Link href="/moderation">Модерация</Link><Link href="/settings">Настройки</Link></nav> : isCompany ? <nav className="desktop-public-nav flex items-center gap-7 text-sm font-semibold"><Link href="/company">Кабинет</Link><Link href="/company/sales">Отдел продаж</Link><Link href="/company/employees">Клинеры</Link><Link href="/company/orders" className="header-order-button">Заказы компании</Link></nav> : <><nav className="desktop-public-nav flex items-center gap-7 text-sm font-semibold"><a href="/#services">Услуги</a><a href="/#how">Как это работает</a><Link href="/profile" className="text-emerald-700">Профиль</Link><Link href="/login" className="text-slate-500">Войти</Link><Link href="/register" className="text-emerald-700">Регистрация</Link><Link href="/order/new" className="header-order-button">Заказать уборку</Link></nav>{!isAdminLogin&&<Link href="/register" className="mobile-register-button">Регистрация</Link>}</>}
-      {isAdmin && <Link href="/communities" className="ml-4 text-sm font-bold text-emerald-700">Сообщества</Link>}
-    </div>
-  </header>{!isAdmin && !isAdminLogin && (isCompany ? <nav className="mobile-tabbar" aria-label="Навигация компании">
-    <Link href="/company" className={pathname === '/company' ? 'active' : ''}><span>⌂</span><small>Кабинет</small></Link>
-    <Link href="/company/orders" className={pathname.startsWith('/company/orders') ? 'active' : ''}><span className="tab-order-icon">≡</span><small>Заказы</small></Link>
-    <Link href="/company/employees" className={pathname.startsWith('/company/employees') ? 'active' : ''}><span>◎</span><small>Клинеры</small></Link>
-  </nav> : <nav className="mobile-tabbar" aria-label="Основная навигация">
-    <Link href="/" className={pathname === '/' ? 'active' : ''}><span>⌂</span><small>Главная</small></Link>
-    <Link href="/#services"><span>✦</span><small>Услуги</small></Link>
-    <Link href="/order/new" className={pathname.startsWith('/order') ? 'active' : ''}><span className="tab-order-icon">＋</span><small>Заказать</small></Link>
-    <Link href="/profile" className={pathname === '/profile' || pathname === '/login' ? 'active' : ''}><span>◎</span><small>Профиль</small></Link>
-  </nav>)}</>;
+  return (
+    <>
+      <header
+        className={`site-header ${isAdmin ? 'admin-header' : isCompany ? 'company-header' : ''}`}
+      >
+        <div className="header-inner">
+          <Link
+            href={isAdmin ? '/admin' : isCompany ? '/company' : '/'}
+            className="site-logo"
+          >
+            <span className="brand-mark">
+              <Icon name="sparkle" />
+            </span>
+            <span>
+              Cleaning <b>Go</b>
+              {(isAdmin || isCompany) && (
+                <small>{isAdmin ? 'Администратор' : 'Кабинет компании'}</small>
+              )}
+            </span>
+          </Link>
+          {isAdmin || isCompany ? (
+            <>
+              <nav
+                className="desktop-public-nav"
+                aria-label="Навигация кабинета"
+              >
+                {(isAdmin ? adminLinks : companyLinks).map(([href, label]) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    aria-current={active(href) ? 'page' : undefined}
+                  >
+                    {label}
+                  </Link>
+                ))}
+              </nav>
+              <button
+                className="mobile-menu-button"
+                type="button"
+                aria-expanded={menuOpen}
+                aria-controls="cabinet-menu"
+                aria-label={menuOpen ? 'Закрыть меню' : 'Открыть меню'}
+                onClick={() => setMenuOpen(!menuOpen)}
+              >
+                <Icon name={menuOpen ? 'close' : 'menu'} />
+              </button>
+            </>
+          ) : (
+            <>
+              <nav
+                className="desktop-public-nav"
+                aria-label="Основная навигация"
+              >
+                <a href="/#services">Услуги</a>
+                <a href="/#how">Как это работает</a>
+                <Link href="/profile">Профиль</Link>
+                <Link href="/login">Войти</Link>
+                <Link href="/order/new" className="header-order-button">
+                  Заказать уборку <Icon name="arrow" width="18" height="18" />
+                </Link>
+              </nav>
+              {!isAdminLogin && (
+                <Link
+                  href={isAuth ? '/' : '/login'}
+                  className="mobile-register-button"
+                >
+                  {isAuth ? 'На главную' : 'Войти'}
+                  <Icon
+                    name={isAuth ? 'home' : 'user'}
+                    width="17"
+                    height="17"
+                  />
+                </Link>
+              )}
+            </>
+          )}
+        </div>
+        {menuOpen && (isAdmin || isCompany) && (
+          <nav
+            id="cabinet-menu"
+            className="cabinet-menu"
+            aria-label="Разделы кабинета"
+          >
+            {(isAdmin ? adminLinks : companyLinks).map(([href, label]) => (
+              <Link
+                href={href}
+                key={href}
+                onClick={() => setMenuOpen(false)}
+                aria-current={active(href) ? 'page' : undefined}
+              >
+                {label}
+                <Icon name="arrow" width="18" height="18" />
+              </Link>
+            ))}
+          </nav>
+        )}
+      </header>
+      {!isAdmin && !isAdminLogin && (
+        <nav
+          className="mobile-tabbar"
+          aria-label={isCompany ? 'Навигация компании' : 'Основная навигация'}
+        >
+          {tabs.map((tab) => {
+            const selected =
+              active(tab.href) ||
+              (tab.href === '/profile' && isAuth) ||
+              (tab.primary && pathname.startsWith('/order/'));
+            return (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                className={selected ? 'active' : ''}
+                aria-current={selected ? 'page' : undefined}
+              >
+                <span className={tab.primary ? 'tab-order-icon' : 'tab-icon'}>
+                  <Icon name={tab.icon} />
+                </span>
+                <small>{tab.label}</small>
+              </Link>
+            );
+          })}
+        </nav>
+      )}
+    </>
+  );
 }

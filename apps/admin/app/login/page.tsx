@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { PasswordInput } from '../../components/password-input';
+import { Icon } from '../../components/icon';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -13,33 +15,94 @@ export default function Login() {
     event.preventDefault();
     setError('');
     setLoading(true);
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
-    });
-    const result = await response.json().catch(() => null) as { destination?: string; error?: string } | null;
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+      });
+      const result = (await response.json().catch(() => null)) as {
+        destination?: string;
+        error?: string;
+      } | null;
 
-    if (!response.ok || !result?.destination) {
-      setError(result?.error ?? 'Не удалось войти. Попробуйте ещё раз.');
+      if (!response.ok || !result?.destination) {
+        setError(result?.error ?? 'Не удалось войти. Попробуйте ещё раз.');
+        setLoading(false);
+        return;
+      }
+      window.location.assign(result.destination);
+    } catch {
+      setError('Нет соединения. Проверьте интернет и попробуйте снова.');
       setLoading(false);
-      return;
     }
-    window.location.assign(result.destination);
   }
 
-  return <div className="mx-auto mt-20 max-w-md card">
-    <h1 className="mb-1 text-2xl font-black">Вход в Cleaning Go</h1>
-    <p className="mb-6 text-slate-500">Войдите в аккаунт клиента, клинера или компании.</p>
-    <form onSubmit={submit} className="space-y-4">
-      <input className="input" type="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-      <input className="input" type="password" placeholder="Пароль" value={password} onChange={(event) => setPassword(event.target.value)} required />
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button className="button w-full" disabled={loading}>{loading ? 'Входим…' : 'Войти'}</button>
-    </form>
-    <div className="mt-6 border-t border-slate-200 pt-5 text-center">
-      <p className="text-sm text-slate-500">Нет аккаунта?</p>
-      <Link href="/register" className="mt-2 inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-emerald-600 px-4 font-bold text-emerald-700 transition hover:bg-emerald-50">Зарегистрироваться</Link>
+  return (
+    <div className="auth-shell">
+      <div className="auth-intro">
+        <span className="auth-symbol">
+          <Icon name="sparkle" width="28" height="28" />
+        </span>
+        <p className="section-kicker">С возвращением</p>
+        <h1>
+          Ваш чистый дом
+          <br />
+          начинается здесь.
+        </h1>
+        <p>
+          Войдите, чтобы заказать уборку
+          <br />
+          или продолжить работу.
+        </p>
+      </div>
+      <div className="auth-card card">
+        <h2 className="text-2xl font-black">Вход в аккаунт</h2>
+        <p className="mt-2 mb-6 text-sm text-slate-500">
+          Для клиентов, клинеров и компаний.
+        </p>
+        <form onSubmit={submit} className="space-y-5">
+          <label className="field-label">
+            Email
+            <input
+              className="input mt-2"
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              autoCapitalize="none"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          </label>
+          <label className="field-label">
+            Пароль
+            <PasswordInput
+              autoComplete="current-password"
+              placeholder="Введите пароль"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+          </label>
+          {error && (
+            <p role="alert" className="form-error">
+              {error}
+            </p>
+          )}
+          <button className="button w-full" disabled={loading}>
+            {loading ? 'Входим…' : 'Войти'}
+            <Icon name="arrow" width="18" height="18" />
+          </button>
+        </form>
+        <div className="auth-switch">
+          <p>Впервые в Cleaning Go?</p>
+          <Link href="/register">
+            Создать аккаунт <Icon name="arrow" width="16" height="16" />
+          </Link>
+        </div>
+      </div>
     </div>
-  </div>;
+  );
 }
