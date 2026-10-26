@@ -23,6 +23,7 @@ export default function SignUp() {
   const setProfile = useSessionStore((state) => state.setProfile);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [hasCode, setHasCode] = useState<boolean | null>(null);
   const [referralCode, setReferralCode] = useState('');
@@ -72,6 +73,7 @@ export default function SignUp() {
     const useCode = !isCompany && (cleanerCodeRequired || hasCode === true);
     const parsed = registrationSchema.safeParse({
       email: email.trim(),
+      phone: phone.trim(),
       password,
       fullName: name.trim(),
       role,
@@ -107,6 +109,7 @@ export default function SignUp() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.trim(),
+          phone: phone.trim(),
           password,
           full_name: name.trim(),
           role,
@@ -159,6 +162,7 @@ export default function SignUp() {
       <Card>
         <Field label="Ваше имя" value={name} onChangeText={setName} placeholder="Например, Айдана" />
         <Field label="Email" value={email} onChangeText={setEmail} placeholder="name@example.com" autoCapitalize="none" keyboardType="email-address" />
+        <Field label="Номер телефона *" value={phone} onChangeText={setPhone} placeholder="+7 700 000 00 00" keyboardType="phone-pad" />
         <Field label="Пароль" value={password} onChangeText={setPassword} placeholder="Минимум 8 символов" secureTextEntry />
         <Text style={s.label}>Кто вы?</Text>
         <View style={x.roles}>

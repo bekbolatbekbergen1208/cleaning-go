@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
-const publicPaths = new Set(['/', '/register', '/login', '/admin/login', '/api/register', '/api/auth/login']);
+const publicPaths = new Set(['/', '/register', '/login', '/admin/login', '/api/register', '/api/auth/login', '/reset-password']);
 const adminPaths = ['/admin', '/orders', '/verifications', '/users', '/services', '/moderation', '/settings'];
 
 function secure(response: NextResponse) {
@@ -10,7 +10,7 @@ function secure(response: NextResponse) {
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-DNS-Prefetch-Control', 'off');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=(), usb=(), browsing-topics=()');
+  response.headers.set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(self), payment=(), usb=(), browsing-topics=()');
   response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
   response.headers.set('Cross-Origin-Resource-Policy', 'same-origin');
   response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
@@ -33,7 +33,7 @@ export async function middleware(request: NextRequest) {
     response.cookies.getAll().forEach(cookie => unauthorized.cookies.set(cookie));
     return secure(unauthorized);
   }
-  if (!user && !publicPaths.has(request.nextUrl.pathname)) {
+  if (!user && !publicPaths.has(request.nextUrl.pathname) && !request.nextUrl.pathname.startsWith('/r/')) {
     const isAdminPath = adminPaths.some((path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(`${path}/`));
     const redirectResponse = NextResponse.redirect(new URL(isAdminPath ? '/admin/login' : '/login', request.url));
     response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));

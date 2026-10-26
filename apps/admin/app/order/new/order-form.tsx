@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react';
 import { Icon } from '../../../components/icon';
 import { AddressPicker } from '../../../components/maps/address-picker';
 import type { MapPoint } from '../../../components/maps/astana-map';
-import { isAstana } from '../../../lib/map-coordinates';
 import { createClient } from '../../../lib/supabase/client';
 
 type Service = {
@@ -14,6 +13,13 @@ type Service = {
   name: string;
   description: string | null;
   base_price_minor: number;
+};
+type Cleaner = {
+  id: string;
+  name: string;
+  rating: number;
+  reviews_count: number;
+  work_zone: string | null;
 };
 type Company = {
   id: string;
@@ -27,12 +33,14 @@ type Company = {
 export function OrderForm({
   services,
   companies,
+  cleaners,
   preferredCompanyId,
   companyLocked,
   bonusBalances,
 }: {
   services: Service[];
   companies: Company[];
+  cleaners: Cleaner[];
   preferredCompanyId: string | null;
   companyLocked: boolean;
   bonusBalances?: Record<string, number>;
@@ -43,8 +51,7 @@ export function OrderForm({
   );
   const cityOptions = [
     ...new Set(
-      approvedCompanies
-        .flatMap((company) => company.service_cities)
+      ['Актау', ...approvedCompanies.flatMap((company) => company.service_cities), ...cleaners.map((cleaner) => cleaner.work_zone ?? '')]
         .map((item) => item.trim())
         .filter(Boolean),
     ),
@@ -72,6 +79,8 @@ export function OrderForm({
     preferredCompanyId ?? approvedCompanies[0]?.id ?? '',
   );
   const [bonusKzt, setBonusKzt] = useState(0);
+  const [executor, setExecutor] = useState<'company' | 'cleaner'>('company');
+  const [cleanerId, setCleanerId] = useState('');
   const availableCompanies = companyLocked
     ? approvedCompanies.filter((company) => company.id === preferredCompanyId)
     : approvedCompanies.filter((company) =>
@@ -93,6 +102,10 @@ export function OrderForm({
       )
     : undefined;
   const availableBonusMinor = bonusBalances?.[selectedCompanyId] ?? 0;
+  const availableCleaners = companyLocked ? [] : cleaners.filter((cleaner) =>
+    !cleaner.work_zone || cleaner.work_zone.trim().toLowerCase() === city.trim().toLowerCase(),
+  );
+  const selectedCleaner = availableCleaners.find((cleaner) => cleaner.id === cleanerId);
   const selectedService = services.find((service) => service.id === serviceId);
   const estimatedPrice = (selectedService?.base_price_minor ?? 0) / 100;
 
@@ -104,14 +117,14 @@ export function OrderForm({
     setSuccess('');
     try {
       const form = new FormData(formElement);
-      if (isAstana(city) && !mapPoint) {
-        setError('Отметьте адрес уборки на карте Астаны.');
+      if (!mapPoint) {
+        setError('Отметьте адрес уборки на карте.');
         setBusy(false);
         return;
       }
-      const photo = form.get('photo');
+      const selectedPhoto = photo;
       const scheduledAt = new Date(String(form.get('scheduled_at')));
-      if (!(photo instanceof File) || photo.size === 0) {
+      if (!selectedPhoto || selectedPhoto.size === 0) {
         setError('Добавьте фотографию помещения.');
         setBusy(false);
         return;
@@ -130,10 +143,10 @@ export function OrderForm({
         router.replace('/login');
         return;
       }
-      const photoPath = `${user.id}/${Date.now()}-${photo.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const photoPath = `${user.id}/${Date.now()}-${selectedPhoto.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
       const { error: photoError } = await supabase.storage
         .from('order-photos')
-        .upload(photoPath, photo, { contentType: photo.type, upsert: false });
+        .upload(photoPath, selectedPhoto, { contentType: selectedPhoto.type, upsert: false });
       if (photoError) {
         setError(`Не удалось загрузить фото: ${photoError.message}`);
         setBusy(false);
@@ -145,8 +158,8 @@ export function OrderForm({
         .insert({
           user_id: user.id,
           label: 'Заказ',
-          latitude: isAstana(city) ? mapPoint?.latitude : null,
-          longitude: isAstana(city) ? mapPoint?.longitude : null,
+          latitude: mapPoint.latitude,
+          longitude: mapPoint.longitude,
           city: String(form.get('city')).trim(),
           address_line: String(form.get('address')).trim(),
         })
@@ -158,7 +171,12 @@ export function OrderForm({
         return;
       }
 
-      const requestedBonusMinor = Math.round(Number(bonusKzt) * 100);
+      if (executor === 'cleaner' && !selectedCleaner) {
+        setError('Выберите доступного клинера.');
+        setBusy(false);
+        return;
+      }
+      const requestedBonusMinor = executor === 'company' ? Math.round(Number(bonusKzt) * 100) : 0;
       if (
         requestedBonusMinor < 0 ||
         requestedBonusMinor > availableBonusMinor
@@ -175,12 +193,13 @@ export function OrderForm({
           payload: {
             address_id: address.id,
             service_id: String(form.get('service_id')),
-            selected_company_id: selectedCompanyId,
+            selected_company_id: executor === 'company' ? selectedCompanyId : null,
+            selected_cleaner_id: executor === 'cleaner' ? selectedCleaner?.id : null,
             scheduled_at: scheduledAt.toISOString(),
             area_sq_m: Number(form.get('area_sq_m')),
             rooms_count: Number(form.get('rooms_count')),
             comment: String(form.get('comment') ?? '').trim(),
-            executor_preference: 'company',
+            executor_preference: executor,
             payment_method: 'cash',
             option_ids: [],
             photo_urls: [photoPath],
@@ -194,7 +213,9 @@ export function OrderForm({
         return;
       }
       setSuccess(
-        `Заказ ${order.order_number} создан. Компания скоро подтвердит цену.`,
+        executor === 'cleaner'
+          ? `Заказ ${order.order_number} отправлен клинеру.`
+          : `Заказ ${order.order_number} создан. Компания скоро подтвердит цену.`,
       );
       setBusy(false);
       formElement.reset();
@@ -214,7 +235,7 @@ export function OrderForm({
         <span>✦</span>
         <div>
           <strong>Уборка под ваш график</strong>
-          <p>Заполните детали — компания уточнит стоимость.</p>
+          <p>Заполните детали и выберите исполнителя.</p>
         </div>
       </div>
       <section className="form-section">
@@ -253,8 +274,7 @@ export function OrderForm({
               </p>
             )}
             <p className="mt-2 text-xs text-slate-500">
-              Это ориентир. Компания подтвердит точную цену после просмотра
-              фото, площади и деталей заказа.
+              Это ориентир. Итоговая цена зависит от выбранного исполнителя и деталей заказа.
             </p>
           </div>
         )}
@@ -286,16 +306,34 @@ export function OrderForm({
             />
           </label>
         </div>
-        {isAstana(city) && (
-          <AddressPicker value={mapPoint} onChange={setMapPoint} />
-        )}
+        <AddressPicker city={city} value={mapPoint} onChange={setMapPoint} />
       </section>
       <section className="form-section">
         <div className="form-section-heading">
           <span>02</span>
-          <h2>Выберите компанию</h2>
+          <h2>Выберите исполнителя</h2>
         </div>
-        {companyLocked ? (
+        {!companyLocked && (
+          <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Тип исполнителя">
+            <button type="button" className={executor === 'company' ? 'button' : 'rounded-xl border border-slate-300 px-4 py-2 font-bold'} onClick={() => setExecutor('company')}>Компания</button>
+            <button type="button" className={executor === 'cleaner' ? 'button' : 'rounded-xl border border-slate-300 px-4 py-2 font-bold'} onClick={() => setExecutor('cleaner')}>Частный клинер</button>
+          </div>
+        )}
+        {executor === 'cleaner' && !companyLocked ? (
+          <>
+            <p className="mt-3 text-xs text-slate-500">Проверенные свободные клинеры в городе «{city}», сначала с высоким рейтингом.</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {availableCleaners.map((cleaner) => (
+                <button type="button" key={cleaner.id} onClick={() => setCleanerId(cleaner.id)} aria-pressed={selectedCleaner?.id === cleaner.id} className={`rounded-2xl border-2 p-4 text-left ${selectedCleaner?.id === cleaner.id ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200'}`}>
+                  <b className="block">{cleaner.name}</b>
+                  <span className="mt-1 block text-sm text-amber-700">★ {cleaner.rating.toFixed(1)} · {cleaner.reviews_count} отзывов</span>
+                  {cleaner.work_zone && <span className="text-xs text-slate-500">{cleaner.work_zone}</span>}
+                </button>
+              ))}
+            </div>
+            {!availableCleaners.length && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm">В этом городе пока нет доступных частных клинеров.</p>}
+          </>
+        ) : companyLocked ? (
           lockedCompany ? (
             <div className="mt-2 rounded-2xl border-2 border-emerald-500 bg-emerald-50 p-4">
               <b className="text-lg">{lockedCompany.name}</b>
@@ -362,7 +400,7 @@ export function OrderForm({
           <span>03</span>
           <h2>Детали уборки</h2>
         </div>
-        {bonusBalances && (
+        {executor === 'company' && bonusBalances && (
           <label className="block">
             <span className="text-sm font-semibold">Использовать бонусы</span>
             <input
@@ -425,12 +463,14 @@ export function OrderForm({
             <input
               aria-label="Фото помещения"
               type="file"
-              name="photo"
               accept="image/jpeg,image/png,image/webp"
               onChange={(event) => setPhoto(event.target.files?.[0] ?? null)}
-              required
             />
           </span>
+        </label>
+        <label className="inline-flex cursor-pointer items-center rounded-xl border border-emerald-600 px-4 py-3 text-sm font-bold text-emerald-700">
+          {photo ? 'Переснять фотографию' : 'Сделать фотографию камерой'}
+          <input className="sr-only" type="file" accept="image/*" capture="environment" aria-label="Сделать фотографию камерой" onChange={(event) => setPhoto(event.target.files?.[0] ?? null)} />
         </label>
         {photoPreview && (
           <div className="photo-preview">
@@ -445,8 +485,7 @@ export function OrderForm({
       </section>
       <div className="order-submit">
         <p className="text-sm text-slate-500">
-          Оплата наличными. Итоговую цену компания подтвердит после просмотра
-          фотографии.
+          Оплата наличными. Итоговая цена зависит от выбранного исполнителя и деталей заказа.
         </p>
         {error && (
           <p role="alert" className="text-sm font-semibold text-red-600">
@@ -460,7 +499,7 @@ export function OrderForm({
         )}
         <button
           className="button w-full"
-          disabled={busy || !services.length || !availableCompanies.length}
+          disabled={busy || !services.length || (executor === 'company' ? !availableCompanies.length : !selectedCleaner)}
         >
           {busy ? 'Создаём заказ…' : 'Отправить заказ'}
           <Icon name="arrow" width="18" height="18" />

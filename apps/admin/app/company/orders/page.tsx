@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/server';
 import { proposeCompanyPrice, updatePublishedOrder } from './actions';
+import { LiveOrderUpdates } from '../../../components/live-order-updates';
 
 const statusNames: Record<string, string> = {
   searching: 'Ожидает компании',
@@ -46,11 +47,14 @@ export default async function CompanyOrders() {
     .eq('selected_company_id', company.id)
     .order('created_at', { ascending: false });
 
+  const { data: membership } = await admin.from('community_companies').select('cleaner_communities(is_active)').eq('company_id', company.id).maybeSingle();
+  const communityReady = Boolean((membership?.cleaner_communities as unknown as { is_active: boolean } | null)?.is_active);
+
   const roomPhotos = new Map<string, string[]>();
   const photoEntries=(orders??[]).flatMap(order=>((order.photo_urls??[]) as string[]).filter(path=>!path.includes('/completion-')).map(path=>({orderId:order.id,path})));
   if(photoEntries.length){const{data}=await admin.storage.from('order-photos').createSignedUrls(photoEntries.map(item=>item.path),3600);(data??[]).forEach((item,index)=>{if(!item.signedUrl)return;const orderId=photoEntries[index]?.orderId;if(!orderId)return;roomPhotos.set(orderId,[...(roomPhotos.get(orderId)??[]),item.signedUrl]);});}
 
-  return <div className="mx-auto max-w-5xl px-4 py-8">
+  return <div className="mx-auto max-w-5xl px-4 py-8"><LiveOrderUpdates companyId={company.id}/>
     <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-bold text-emerald-700">{company.name}</p><h1 className="text-3xl font-black">Заказы компании</h1></div><Link className="rounded-xl border px-4 py-2 font-bold" href="/company">← Кабинет</Link></div>
     {error ? <p className="card mt-6 text-red-600">Не удалось загрузить заказы: {error.message}</p> : orders?.length ? <div className="mt-6 space-y-3">{orders.map((order) => {
       const client = order.profiles as unknown as { full_name?: string; phone?: string } | null;
@@ -60,7 +64,8 @@ export default async function CompanyOrders() {
         <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-black">Заказ {order.order_number}</h2><p className="mt-1 text-sm text-slate-500">{client?.full_name ?? 'Клиент'} · {client?.phone ?? 'телефон не указан'}</p>{phone && <div className="mt-3 flex flex-wrap gap-2"><a className="rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white" href={`https://wa.me/${phone}?text=${encodeURIComponent(`Здравствуйте! Пишем по вашему заказу ${order.order_number} в Cleaning Go.`)}`} target="_blank" rel="noreferrer">Написать в WhatsApp</a><a className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white" href={`tel:+${phone}`}>Позвонить</a></div>}</div><span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">{statusNames[order.status] ?? order.status}</span></div>
         <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2"><p><b>Адрес:</b> {order.city}, {order.address_text}</p><p><b>Дата:</b> {new Date(order.scheduled_at).toLocaleString('ru-KZ')}</p><p><b>Помещение:</b> {order.area_sq_m} м², {order.rooms_count} комн.</p><p><b>Сумма:</b> {(Number(order.total_minor) / 100).toLocaleString('ru-RU')} ₸</p></div>
         {Boolean(roomPhotos.get(order.id)?.length) && <div className="mt-4"><p className="mb-2 text-sm font-bold text-slate-700">Фото помещения</p><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{roomPhotos.get(order.id)?.map((url, index) => <a href={url} target="_blank" rel="noreferrer" key={url}><img className="h-40 w-full rounded-xl object-cover" src={url} alt={`Фото помещения ${index + 1}`} loading="lazy" decoding="async" width="640" height="400"/></a>)}</div></div>}
-        {order.status === 'searching' ? <form action={proposeCompanyPrice} className="mt-5 grid gap-3 rounded-2xl bg-emerald-50 p-4 sm:grid-cols-3">
+        {order.status === 'searching' && !communityReady && <p className="mt-5 rounded-xl bg-amber-50 p-4 text-sm font-semibold text-amber-800">Чтобы отправить цену и затем передать заказ клинерам, <Link href="/company" className="underline">подключите активное сообщество</Link>.</p>}
+        {order.status === 'searching' && communityReady ? <form action={proposeCompanyPrice} className="mt-5 grid gap-3 rounded-2xl bg-emerald-50 p-4 sm:grid-cols-3">
           <input type="hidden" name="order_id" value={order.id}/>
           <label className="text-sm font-bold text-emerald-900">Цена для клиента, ₸<input className="input mt-1 bg-white" name="total_kzt" type="number" min="100" step="1" required/></label>
           <label className="text-sm font-bold text-emerald-900">Количество клинеров<input className="input mt-1 bg-white" name="required_workers" type="number" min="1" max="50" defaultValue="1" required/></label>

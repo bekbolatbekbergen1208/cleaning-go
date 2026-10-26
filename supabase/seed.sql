@@ -1,9 +1,9 @@
 -- Демо-данные не предназначены для production. Пароли здесь намеренно не заданы:
 -- интерактивные тестовые аккаунты создавайте через Dashboard/seed script с .env.
-insert into auth.users(id,instance_id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
+insert into auth.users(id,instance_id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at,confirmation_token,recovery_token,email_change_token_new,email_change)
 select (md5('demo-user-'||n)::uuid),'00000000-0000-0000-0000-000000000000','authenticated','authenticated',
   'demo'||n||'@example.test',extensions.crypt(encode(extensions.gen_random_bytes(32),'hex'),extensions.gen_salt('bf')),now(),'{}',
-  jsonb_build_object('full_name',case when n=27 then 'Администратор Demo' else 'Пользователь '||n end,'role','client'),now(),now()
+  jsonb_build_object('full_name',case when n=27 then 'Администратор Demo' else 'Пользователь '||n end,'role','client'),now(),now(),'','','',''
 from generate_series(1,27)n on conflict(id) do nothing;
 
 -- Доверенная подготовка ролей для seed; публичная регистрация применяет проверку кода.
@@ -21,6 +21,19 @@ where user_id in(select md5('demo-user-'||n)::uuid from generate_series(6,22)n);
 update public.company_profiles c set name=x.name,verification_status='approved',service_cities=array['Актау'],description='Проверенная клининговая компания'
 from(values(md5('demo-user-23')::uuid,'Таза Үй'),(md5('demo-user-24')::uuid,'Aqtau Clean'),(md5('demo-user-25')::uuid,'Sea Breeze Cleaning'))x(owner_id,name)
 where c.owner_id=x.owner_id;
+
+-- Активное демо-сообщество, чтобы компании могли предложить цену,
+-- а проверенные клинеры увидели заказ после её подтверждения.
+insert into public.cleaner_communities(id,name,code,description,created_by)
+values(md5('demo-cleaner-community')::uuid,'Демо-сообщество Актау','COM-DEMO-AKTAU','Локальное сообщество для проверки заказов',md5('demo-user-27')::uuid)
+on conflict(id) do nothing;
+insert into public.community_companies(community_id,company_id)
+select md5('demo-cleaner-community')::uuid,c.id from public.company_profiles c
+where c.owner_id in(select md5('demo-user-'||n)::uuid from generate_series(23,25)n)
+on conflict(company_id) do nothing;
+insert into public.community_cleaners(community_id,cleaner_id)
+select md5('demo-cleaner-community')::uuid,md5('demo-user-'||n)::uuid from generate_series(6,22)n
+on conflict(cleaner_id) do nothing;
 
 -- По три сотрудника для каждой компании (часть demo-клинеров).
 insert into public.company_cleaners(company_id,cleaner_id)

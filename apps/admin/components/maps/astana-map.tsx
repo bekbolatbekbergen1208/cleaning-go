@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { Map as LeafletMap, LayerGroup, LeafletMouseEvent } from 'leaflet';
-import { astanaBounds } from '../../lib/map-coordinates';
+import { cityCenter } from '../../lib/city-map';
 
 export type MapPoint = { latitude: number; longitude: number };
 export type MapMarker = MapPoint & {
@@ -15,10 +15,12 @@ export function AstanaMap({
   markers = [],
   route = [],
   onPick,
+  city = 'Астана',
 }: {
   markers?: MapMarker[];
   route?: [number, number][];
   onPick?: (point: MapPoint) => void;
+  city?: string;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LeafletMap | null>(null);
@@ -26,10 +28,12 @@ export function AstanaMap({
   const pick = useRef(onPick);
   const fitted = useRef(false);
   const [ready, setReady] = useState(false);
+  const center = cityCenter(city);
   const [error, setError] = useState('');
   pick.current = onPick;
 
   useEffect(() => {
+    fitted.current = false;
     let disposed = false;
     void import('leaflet')
       .then((L) => {
@@ -37,14 +41,9 @@ export function AstanaMap({
         map.current = L.map(container.current, {
           zoomControl: true,
           scrollWheelZoom: false,
-          minZoom: 10,
+          minZoom: 3,
           maxZoom: 19,
-          maxBounds: [
-            [astanaBounds.south - 0.1, astanaBounds.west - 0.1],
-            [astanaBounds.north + 0.1, astanaBounds.east + 0.1],
-          ],
-          maxBoundsViscosity: 0.8,
-        }).setView([51.1282, 71.4304], 12);
+        }).setView([center.latitude, center.longitude], 12);
         L.tileLayer(
           process.env.NEXT_PUBLIC_MAP_TILE_URL ||
             'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -77,7 +76,7 @@ export function AstanaMap({
       map.current = null;
       layers.current = null;
     };
-  }, []);
+  }, [city, center.latitude, center.longitude]);
 
   useEffect(() => {
     if (!ready) return;
@@ -136,14 +135,22 @@ export function AstanaMap({
         ),
         { padding: [45, 55], maxZoom: 16 },
       );
-    else map.current.setView([51.1282, 71.4304], 12);
+    else map.current.setView([center.latitude, center.longitude], 12);
+  }
+  function locateMe() {
+    if (!navigator.geolocation) { setError('Геолокация недоступна в браузере.'); return; }
+    navigator.geolocation.getCurrentPosition(
+      position => map.current?.setView([position.coords.latitude, position.coords.longitude], 16),
+      () => setError('Не удалось определить местоположение.'),
+      { enableHighAccuracy: true, timeout: 10_000 },
+    );
   }
   return (
     <div className="map-shell relative overflow-hidden rounded-2xl border border-slate-200">
       <div
         ref={container}
         className="map-canvas relative z-0 h-[360px] w-full sm:h-[440px]"
-        aria-label="Карта Астаны"
+        aria-label={`Карта города ${city}`}
       />
       <button
         type="button"
@@ -152,6 +159,7 @@ export function AstanaMap({
       >
         Показать все точки
       </button>
+      {onPick && <button type="button" onClick={locateMe} className="absolute right-3 top-14 z-[500] rounded-xl bg-white px-3 py-2 text-xs font-bold shadow">Моё местоположение</button>}
       {!ready && !error && (
         <p className="absolute bottom-3 left-3 z-[500] rounded-lg bg-white p-2 text-sm">
           Загружаем карту…

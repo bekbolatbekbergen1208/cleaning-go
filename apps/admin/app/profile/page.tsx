@@ -5,8 +5,11 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { createClient } from '../../lib/supabase/server';
 import { CommunityJoinForm } from './community-join-form';
 import { InvitationCard } from './invitation-card';
-import { confirmCompanyPrice, confirmOrderCompletion } from './actions';
+import { confirmOrderCompletion } from './actions';
+import { ConfirmPriceForm } from './confirm-price-form';
 import { CancelOrderButton } from './cancel-order-button';
+import { LiveOrderUpdates } from '../../components/live-order-updates';
+import { WorkdayToggle } from './workday-toggle';
 
 const roleNames: Record<string, string> = {
   client: 'Клиент',
@@ -94,6 +97,7 @@ export default async function ProfilePage() {
   );
   const isCleaner =
     profile?.role === 'cleaner' || profile?.role === 'company_cleaner';
+  const { data: cleanerAvailability } = isCleaner ? await supabase.from('cleaner_profiles').select('is_available').eq('user_id', user.id).maybeSingle() : { data: null };
   const { data: membership, error: membershipError } = isCleaner
     ? await supabase
         .from('community_cleaners')
@@ -112,7 +116,12 @@ export default async function ProfilePage() {
       .from('order_workers')
       .select('order_id')
       .eq('cleaner_id', user.id);
-    const assignedOrderIds = (assignments ?? []).map((item) => item.order_id);
+    const { data: directAssignments } = await admin
+      .from('order_assignments')
+      .select('order_id')
+      .eq('cleaner_id', user.id)
+      .eq('is_active', true);
+    const assignedOrderIds = [...new Set([...(assignments ?? []).map((item) => item.order_id), ...(directAssignments ?? []).map((item) => item.order_id)])];
     const { data: cleanerOrders } = assignedOrderIds.length
       ? await admin
           .from('orders')
@@ -180,7 +189,7 @@ export default async function ProfilePage() {
   }
 
   return (
-    <div className="profile-shell mx-auto max-w-2xl px-4 py-10">
+    <div className="profile-shell mx-auto max-w-2xl px-4 py-10"><LiveOrderUpdates userId={user.id} />
       <section className="card profile-card">
         <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">
           Профиль
@@ -202,6 +211,7 @@ export default async function ProfilePage() {
             <Link href="/cleaner/company-orders" className="button w-full">
               Найти заказы
             </Link>
+            {profile?.role === 'cleaner' && <Link href="/cleaner/direct-orders" className="rounded-xl border border-emerald-600 px-4 py-3 text-center font-bold text-emerald-700">Заказы напрямую мне</Link>}
             <Link
               href="/cleaner/my-work"
               className="rounded-xl border border-emerald-600 px-4 py-3 text-center font-bold text-emerald-700"
@@ -210,6 +220,7 @@ export default async function ProfilePage() {
             </Link>
           </div>
         )}
+        {isCleaner && <WorkdayToggle active={Boolean(cleanerAvailability?.is_available)} />}
         {isCleaner && (
           <section className="mt-6 rounded-xl bg-emerald-50 p-4">
             <h2 className="font-black">Моё сообщество</h2>
@@ -284,14 +295,14 @@ export default async function ProfilePage() {
           </div>
         </dl>
         {profile?.role === 'client' && (
-          <InvitationCard
+          <><Link href="/profile/company" className="mt-6 inline-flex rounded-xl border border-emerald-600 px-4 py-3 font-bold text-emerald-700">Выбрать или сменить компанию →</Link><InvitationCard
             referralCode={referral?.code ?? null}
             companyName={
               (clientProfile?.company_profiles as { name?: string } | null)
                 ?.name ?? null
             }
             locked={Boolean(clientProfile?.company_locked)}
-          />
+          /></>
         )}
         {profile?.role === 'client' && Boolean(bonuses?.length) && (
           <div className="mt-8">
@@ -344,7 +355,7 @@ export default async function ProfilePage() {
         )}
         {profile?.role === 'client' && (
           <div className="mt-8">
-            <h2 className="text-lg font-black">Последние заказы</h2>
+            <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-black">Последние заказы</h2><Link href="/profile/orders" className="text-sm font-bold text-emerald-700">Все заказы →</Link></div>
             <div className="mt-3 space-y-2">
               {orders?.length ? (
                 orders.map((order) => (
@@ -377,19 +388,7 @@ export default async function ProfilePage() {
                     </p>
                     {order.status === 'offered' &&
                       !order.price_confirmed_at && (
-                        <form action={confirmCompanyPrice} className="mt-3">
-                          <input
-                            type="hidden"
-                            name="order_id"
-                            value={order.id}
-                          />
-                          <p className="mb-2 text-sm font-semibold">
-                            Компания предложила цену {money(order.total_minor)}
-                          </p>
-                          <button className="button w-full">
-                            Подтвердить цену
-                          </button>
-                        </form>
+                        <ConfirmPriceForm orderId={order.id} price={money(order.total_minor)} />
                       )}
                     {order.status === 'offered' && order.price_confirmed_at && (
                       <p className="mt-2 text-xs font-semibold text-emerald-700">
@@ -464,6 +463,7 @@ export default async function ProfilePage() {
         {Boolean(notifications?.length) && (
           <div className="mt-8">
             <h2 className="text-lg font-black">Уведомления</h2>
+            <Link href="/notifications" className="text-sm font-bold text-emerald-700">Все уведомления →</Link>
             <div className="mt-3 space-y-2">
               {notifications?.map((item) => (
                 <div className="rounded-2xl bg-sky-50 p-4" key={item.id}>
@@ -477,6 +477,7 @@ export default async function ProfilePage() {
             </div>
           </div>
         )}
+        <Link href="/notifications" className="mt-6 inline-block text-sm font-bold text-emerald-700">Открыть уведомления →</Link>
         <form action={signOut} className="mt-8">
           <button className="button w-full" type="submit">
             Выйти

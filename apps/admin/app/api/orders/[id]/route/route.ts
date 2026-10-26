@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { inAstana, trackingAccess, trackingStatuses } from '../../../../../lib/tracking';
+import { trackingAccess, trackingStatuses } from '../../../../../lib/tracking';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const access = await trackingAccess((await params).id);
@@ -13,7 +13,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!point || !address || address.latitude == null || address.longitude == null || Date.now() - Date.parse(point.recorded_at) > 120_000) return NextResponse.json({ error: 'Для маршрута нужны актуальная геопозиция и точка адреса' }, { status: 409 });
   const start: [number, number] = [Number(point.longitude), Number(point.latitude)];
   const end: [number, number] = [Number(address.longitude), Number(address.latitude)];
-  if (!inAstana(start[1], start[0]) || !inAstana(end[1], end[0])) return NextResponse.json({ error: 'Маршруты пока доступны только в Астане' }, { status: 400 });
   try {
     const base = process.env.OSRM_BASE_URL || 'https://router.project-osrm.org';
     const response = await fetch(`${base}/route/v1/driving/${start.join(',')};${end.join(',')}?overview=full&geometries=geojson&steps=false`, { signal: AbortSignal.timeout(10_000), cache: 'no-store' });

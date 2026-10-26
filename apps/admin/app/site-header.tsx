@@ -21,6 +21,8 @@ const companyLinks = [
   ['/company/employees', 'Клинеры'],
   ['/company/cities', 'Города'],
   ['/company/orders', 'Заказы'],
+  ['/company/reports', 'Отчёты'],
+  ['/company/tracking', 'Карта'],
 ] as const;
 
 export function SiteHeader() {

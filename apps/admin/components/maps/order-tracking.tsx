@@ -4,10 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '../../lib/supabase/client';
 import { AstanaMap, type MapPoint, type MapMarker } from './astana-map';
 import { AddressPicker } from './address-picker';
-import { isAstana } from '../../lib/map-coordinates';
 
 type Location = MapPoint & { cleaner_id: string; name: string; recorded_at: string };
-type Snapshot = { order: { status: string; city: string }; active: boolean; isCleaner: boolean; isClient: boolean; userId: string; destination: MapPoint | null; locations: Location[] };
+type Snapshot = { order: { status: string; city: string }; active: boolean; isCleaner: boolean; canShare: boolean; isClient: boolean; userId: string; destination: MapPoint | null; locations: Location[] };
 type Route = { coordinates: [number, number][]; distance: number; duration: number };
 const statusLabels: Record<string, string> = { accepted: 'Команда набирается', on_the_way: 'Клинер в пути', arrived: 'Клинер на месте', in_progress: 'Уборка идёт', completed_by_cleaner: 'Ожидается подтверждение', completed: 'Завершён', cancelled: 'Отменён', disputed: 'Спор' };
 
@@ -65,6 +64,7 @@ export function OrderTracking({ orderId }: { orderId: string }) {
 
   function startSharing() {
     if (watcher.current !== null) return;
+    if (!snapshot?.canShare) { setGpsError('Начните рабочий день в профиле, чтобы включить геолокацию.'); return; }
     if (!window.isSecureContext || !navigator.geolocation) { setGpsError('Геолокация доступна через HTTPS или localhost.'); return; }
     setGpsError(''); setSharing(true);
     watcher.current = navigator.geolocation.watchPosition(position => { latestPosition.current = position; }, failure => {
@@ -96,14 +96,14 @@ export function OrderTracking({ orderId }: { orderId: string }) {
   }, [sharing, orderId]);
 
   const trackingActive = snapshot?.active;
-  useEffect(() => { if (trackingActive === false) stopSharing(); }, [trackingActive, stopSharing]);
+  useEffect(() => { if (trackingActive === false || snapshot?.canShare === false) stopSharing(); }, [trackingActive, snapshot?.canShare, stopSharing]);
   useEffect(() => () => {
     generation.current += 1;
     if (watcher.current !== null) navigator.geolocation.clearWatch(watcher.current);
   }, []);
 
   const locations = snapshot?.active ? snapshot.locations : [];
-  const currentCleaner = locations.some(point => point.cleaner_id === selectedCleaner) ? selectedCleaner : locations[0]?.cleaner_id ?? '';
+  const currentCleaner = locations.some(point => point.cleaner_id === selectedCleaner) ? selectedCleaner : snapshot?.isCleaner && locations.some(point => point.cleaner_id === snapshot.userId) ? snapshot.userId : locations[0]?.cleaner_id ?? '';
   useEffect(() => {
     let disposed = false;
     const controller = new AbortController();
@@ -111,7 +111,7 @@ export function OrderTracking({ orderId }: { orderId: string }) {
     async function updateRoute() {
       const state = latestSnapshot.current;
       const point = state?.locations.find(item => item.cleaner_id === currentCleaner);
-      if (!state?.active || !point || !state.destination || !isAstana(state.order.city) || Date.now() - Date.parse(point.recorded_at) > 120_000) {
+      if (!state?.active || !point || !state.destination || Date.now() - Date.parse(point.recorded_at) > 120_000) {
         if (!disposed) { setRoute(null); setRouteError(''); } return;
       }
       try {
@@ -146,18 +146,16 @@ export function OrderTracking({ orderId }: { orderId: string }) {
     ...locations.map(point => ({ ...point, id: point.cleaner_id, label: point.name, stale: now - Date.parse(point.recorded_at) > 120_000 })),
   ];
   return <section className="card space-y-5 sm:p-6">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-black">Клинеры на карте</h2><p className="mt-1 text-sm text-slate-500">{statusLabels[snapshot.order.status] ?? snapshot.order.status}</p></div><span className={`rounded-full px-3 py-2 text-xs font-bold ${fresh && !error ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{fresh && !error ? 'Геопозиция обновляется' : 'Ожидаем актуальный GPS'}</span></div>
-    {!isAstana(snapshot.order.city) ? <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">Карта и маршруты пока доступны для заказов в Астане.</p> : <>
-      {snapshot.isCleaner && snapshot.active && <div className="rounded-2xl bg-emerald-50 p-4"><p className="font-bold">Поделитесь своим местоположением</p><p className="mt-1 text-sm text-emerald-800">Клиент и компания увидят вас на карте этого заказа. Разрешите геолокацию и держите эту страницу открытой. При закрытии вкладки или блокировке телефона передача может остановиться.</p><button type="button" onClick={sharing ? stopSharing : startSharing} className="button mt-3">{sharing ? 'Остановить передачу' : 'Включить геолокацию'}</button><p className="mt-2 text-xs">{sharing ? 'Передаём GPS примерно раз в 10 секунд.' : 'Передача выключена.'}</p>{gpsError && <p role="alert" className="mt-2 text-sm text-red-700">{gpsError}</p>}</div>}
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-black">{snapshot.isCleaner ? 'Маршрут к клиенту' : 'Клинеры на карте'}</h2><p className="mt-1 text-sm text-slate-500">{statusLabels[snapshot.order.status] ?? snapshot.order.status}</p></div><span className={`rounded-full px-3 py-2 text-xs font-bold ${fresh && !error ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{fresh && !error ? 'Геопозиция обновляется' : 'Ожидаем актуальный GPS'}</span></div>
+    {snapshot.isCleaner && snapshot.active && <div className="rounded-2xl bg-emerald-50 p-4"><p className="font-bold">Поделитесь своим местоположением</p><p className="mt-1 text-sm text-emerald-800">Клиент и компания увидят вас на карте этого заказа. Разрешите геолокацию и держите эту страницу открытой. При закрытии вкладки или блокировке телефона передача может остановиться.</p>{!snapshot.canShare && <p className="mt-2 text-sm font-bold text-amber-800">Рабочий день завершён. Начните его в профиле, чтобы снова передавать GPS. <a href="/profile" className="underline">Открыть профиль</a></p>}<button type="button" disabled={!snapshot.canShare} onClick={sharing ? stopSharing : startSharing} className="button mt-3">{sharing ? 'Остановить передачу' : 'Включить геолокацию'}</button><p className="mt-2 text-xs">{sharing ? 'Передаём GPS примерно раз в 10 секунд.' : 'Передача выключена.'}</p>{gpsError && <p role="alert" className="mt-2 text-sm text-red-700">{gpsError}</p>}</div>}
       {!snapshot.active && <p className="rounded-xl bg-slate-50 p-4 text-sm">Отслеживание остановлено: заказ больше не в активной работе.</p>}
       {!snapshot.destination && <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">У этого заказа ещё нет точки адреса. Клиент может отметить дом на карте ниже, чтобы построить маршрут.</p>}
-      {!snapshot.destination && snapshot.isClient && snapshot.active && <div><AddressPicker value={destinationDraft} onChange={setDestinationDraft} /><button type="button" className="button mt-3" disabled={!destinationDraft || savingDestination} onClick={() => void saveDestination()}>{savingDestination ? 'Сохраняем…' : 'Сохранить точку адреса'}</button></div>}
-      <AstanaMap markers={markers} route={fresh && snapshot.active ? route?.coordinates ?? [] : []} />
+      {!snapshot.destination && snapshot.isClient && snapshot.active && <div><AddressPicker city={snapshot.order.city} value={destinationDraft} onChange={setDestinationDraft} /><button type="button" className="button mt-3" disabled={!destinationDraft || savingDestination} onClick={() => void saveDestination()}>{savingDestination ? 'Сохраняем…' : 'Сохранить точку адреса'}</button></div>}
+      <AstanaMap city={snapshot.order.city} markers={markers} route={fresh && snapshot.active ? route?.coordinates ?? [] : []} />
       {snapshot.active && !locations.length && <p className="text-sm text-slate-500">Ожидаем, когда назначенные клинеры включат геолокацию.</p>}
       {locations.length > 0 && <div className="grid gap-2 sm:grid-cols-2">{locations.map(point => <button type="button" key={point.cleaner_id} onClick={() => setSelectedCleaner(point.cleaner_id)} className={`rounded-xl border p-3 text-left ${point.cleaner_id === currentCleaner ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200'}`}><b className="text-sm">{point.name}</b><p className="mt-1 text-xs text-slate-500">{now - Date.parse(point.recorded_at) > 120_000 ? 'Связь потеряна · последняя точка' : 'Обновлено'} {new Date(point.recorded_at).toLocaleTimeString('ru-KZ')}</p></button>)}</div>}
       {fresh && route && snapshot.active && <div className="rounded-xl bg-blue-50 p-4 text-sm text-blue-900"><b>Маршрут: {(route.distance / 1000).toFixed(1)} км · около {Math.max(1, Math.round(route.duration / 60))} мин</b><p className="mt-1 text-xs">Автомобильный маршрут до адреса уборки. Время приблизительное, без учёта пробок.</p></div>}
       {routeError && <p role="status" className="text-sm text-amber-700">{routeError}</p>}
-    </>}
     {error && <p role="alert" className="text-sm text-red-600">{error}. Повторяем подключение автоматически.</p>}
   </section>;
 }

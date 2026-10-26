@@ -6,7 +6,7 @@ const roles = new Set(['client', 'cleaner', 'company_owner']);
 
 function corsHeaders(request: NextRequest) {
   const origin = request.headers.get('origin');
-  const allowed = !origin || /^https?:\/\/(localhost|127\.0\.0\.1):8081$/.test(origin) || origin === process.env.PUBLIC_APP_URL;
+  const allowed = !origin || origin === request.nextUrl.origin || /^https?:\/\/(localhost|127\.0\.0\.1):8081$/.test(origin) || origin === process.env.PUBLIC_APP_URL;
   return allowed ? { 'Access-Control-Allow-Origin': origin ?? '*', 'Access-Control-Allow-Headers': 'content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS', Vary: 'Origin' } : null;
 }
 

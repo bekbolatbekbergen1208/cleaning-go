@@ -23,6 +23,9 @@ export async function proposeCompanyPrice(formData: FormData) {
   const admin = createAdminClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+  const { data: membership, error: membershipError } = await admin.from('community_companies').select('cleaner_communities(is_active)').eq('company_id', company.id).maybeSingle();
+  if (membershipError) throw new Error('Не удалось проверить сообщество клинеров');
+  if (!(membership?.cleaner_communities as unknown as { is_active: boolean } | null)?.is_active) throw new Error('Сначала подключите активное сообщество клинеров в кабинете компании');
   const { data: order } = await admin.from('orders').select('id,client_id,status,price_confirmed_at').eq('id', orderId).eq('selected_company_id', company.id).in('status', ['searching', 'offered']).maybeSingle();
   if (!order || order.price_confirmed_at) throw new Error('Цена уже подтверждена клиентом');
   const { error: priceError } = await admin.from('orders').update({

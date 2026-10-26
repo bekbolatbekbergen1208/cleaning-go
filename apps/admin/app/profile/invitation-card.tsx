@@ -29,6 +29,19 @@ export function InvitationCard({
     setMessage('Реферальный код скопирован.');
   }
 
+  async function shareReferral() {
+    if (!referralCode) return;
+    const url = `${window.location.origin}/r/${encodeURIComponent(referralCode)}`;
+    const message = `Закажите уборку в Cleaning Go по моей ссылке: ${url}`;
+    try {
+      if (navigator.share) await navigator.share({ title: 'Приглашение в Cleaning Go', text: message, url });
+      else { await navigator.clipboard.writeText(message); setMessage('Приглашение скопировано.'); }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      setMessage('Не удалось поделиться ссылкой.');
+    }
+  }
+
   async function checkCode() {
     setBusy(true);
     setMessage('');
@@ -128,6 +141,7 @@ export function InvitationCard({
             Копировать
           </button>
         </div>
+        <button className="mt-3 text-sm font-bold text-emerald-700" type="button" disabled={!referralCode} onClick={() => void shareReferral()}>Поделиться ссылкой приглашения →</button>
         <p className="mt-2 text-xs text-slate-500">
           Бонус за друга действует только внутри закреплённой компании. Награда
           начисляется только прямому пригласившему.

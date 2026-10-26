@@ -14,6 +14,7 @@ export default async function NewOrderPage() {
     { data: services },
     { data: clientProfile },
     { data: bonuses },
+    { data: cleaners },
   ] = await Promise.all([
     supabase.from('profiles').select('role,status').eq('id', user.id).single(),
     supabase
@@ -30,6 +31,12 @@ export default async function NewOrderPage() {
       .from('company_bonus_balances')
       .select('company_id,balance_minor')
       .eq('client_id', user.id),
+    supabase
+      .from('cleaner_profiles')
+      .select('user_id,rating,reviews_count,work_zone,profiles!user_id(full_name,status)')
+      .eq('verification_status', 'approved')
+      .eq('is_available', true)
+      .order('rating', { ascending: false }),
   ]);
 
   if (profile?.role !== 'client' || profile.status !== 'active')
@@ -87,6 +94,10 @@ export default async function NewOrderPage() {
       <OrderForm
         services={services ?? []}
         companies={companies ?? []}
+        cleaners={(cleaners ?? []).flatMap((cleaner) => {
+          const profile = (Array.isArray(cleaner.profiles) ? cleaner.profiles[0] : cleaner.profiles) as { full_name?: string; status?: string } | null;
+          return profile?.status === 'active' ? [{ id: cleaner.user_id, name: profile.full_name ?? 'Клинер', rating: Number(cleaner.rating), reviews_count: Number(cleaner.reviews_count), work_zone: cleaner.work_zone }] : [];
+        })}
         preferredCompanyId={preferredCompanyId}
         companyLocked={Boolean(clientProfile?.company_locked)}
         bonusBalances={Object.fromEntries(

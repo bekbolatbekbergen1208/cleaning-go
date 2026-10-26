@@ -4,17 +4,19 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '../../lib/supabase/server';
 
-export async function confirmCompanyPrice(formData: FormData) {
+export async function confirmCompanyPrice(_previous: string, formData: FormData): Promise<string> {
   const orderId = String(formData.get('order_id') ?? '');
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !orderId) throw new Error('Заказ не найден');
+  if (!user || !orderId) return 'Заказ не найден. Обновите страницу.';
   const admin = createAdminClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: order } = await admin.from('orders').select('id,selected_company_id,total_minor,required_workers,executor_amount_minor,scheduled_at').eq('id', orderId).eq('client_id', user.id).eq('status', 'offered').is('price_confirmed_at', null).maybeSingle();
-  if (!order) throw new Error('Предложение цены уже недоступно');
-  if (!order.selected_company_id || Number(order.required_workers) < 1 || Number(order.executor_amount_minor) < 0) throw new Error('Компания не указала состав команды');
-  const { data: community } = await admin.from('community_companies').select('community_id').eq('company_id', order.selected_company_id).maybeSingle();
-  if (!community) throw new Error('Компания ещё не вступила в сообщество клинеров');
+  if (!order) return 'Предложение цены уже недоступно. Обновите страницу.';
+  if (!order.selected_company_id || Number(order.required_workers) < 1 || Number(order.executor_amount_minor) < 0) return 'Компания не указала состав команды. Свяжитесь с компанией.';
+  const { data: community, error: communityError } = await admin.from('community_companies').select('community_id,cleaner_communities(is_active)').eq('company_id', order.selected_company_id).maybeSingle();
+  if (communityError) return 'Не удалось проверить сообщество компании. Повторите попытку.';
+  const communityActive = (community?.cleaner_communities as unknown as { is_active: boolean } | null)?.is_active;
+  if (!community || !communityActive) return 'Компания пока не подключила активное сообщество клинеров. Попросите компанию подключиться к сообществу, затем подтвердите цену.';
   const confirmedAt = new Date().toISOString();
   const { error: assignmentError } = await admin.from('order_assignments').insert({
     order_id: order.id,
@@ -23,9 +25,9 @@ export async function confirmCompanyPrice(formData: FormData) {
     assigned_by: user.id,
     accepted_at: confirmedAt,
   });
-  if (assignmentError && assignmentError.code !== '23505') throw new Error(assignmentError.message);
+  if (assignmentError && assignmentError.code !== '23505') return 'Не удалось закрепить заказ за компанией. Повторите попытку.';
   const { error } = await admin.from('orders').update({ price_confirmed_at: confirmedAt, price_confirmed_by: user.id, status: 'accepted' }).eq('id', order.id).eq('client_id', user.id).eq('status', 'offered');
-  if (error) throw new Error(error.message);
+  if (error) return 'Не удалось подтвердить цену. Повторите попытку.';
   await admin.from('order_status_history').insert({ order_id: order.id, from_status: 'offered', to_status: 'accepted', changed_by: user.id, note: 'Клиент подтвердил цену' });
   await admin.from('notifications').insert({ user_id: user.id, order_id: order.id, type: 'cleaning_reminder', title: 'Уборка запланирована', body: `Напоминание: уборка ${new Date(order.scheduled_at).toLocaleString('ru-RU')}` });
   const { data: company } = await admin.from('company_profiles').select('owner_id').eq('id', order.selected_company_id).single();
@@ -33,6 +35,7 @@ export async function confirmCompanyPrice(formData: FormData) {
   revalidatePath('/profile');
   revalidatePath('/company/orders');
   revalidatePath('/cleaner/company-orders');
+  return '';
 }
 
 export async function confirmOrderCompletion(formData: FormData) {

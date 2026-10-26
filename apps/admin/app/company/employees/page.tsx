@@ -37,7 +37,7 @@ export default async function CompanyCleanersPage() {
   const byId = new Map(cleaners.map(cleaner => [cleaner.user_id, cleaner]));
   return <div className="mx-auto max-w-3xl px-4 py-10">
     <Link className="text-sm font-bold text-emerald-700" href="/company">← Кабинет компании</Link>
-    <h1 className="mt-5 text-3xl font-black">Клинеры сообщества</h1>
+    <h1 className="mt-5 text-3xl font-black">Клинеры сообщества</h1><Link href="/company/tracking" className="mt-3 inline-block text-sm font-bold text-emerald-700">Посмотреть активных клинеров на карте →</Link>
     <p className="mt-2 text-sm text-slate-500">Клинеры общие для всех компаний вашего сообщества. Клиенты и их заказы остаются у своей компании.</p>
     {community ? <>
       <section className="card mt-6"><h2 className="text-xl font-black">{community.name}</h2>

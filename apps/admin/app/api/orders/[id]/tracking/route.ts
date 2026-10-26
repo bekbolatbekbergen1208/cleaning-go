@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { inAstana, trackingAccess, trackingStatuses } from '../../../../../lib/tracking';
+import { trackingAccess, trackingStatuses } from '../../../../../lib/tracking';
 import { isSameOriginRequest, readJsonBody } from '../../../../../lib/request-security';
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -7,14 +7,15 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   if (!access) return NextResponse.json({ error: 'Нет доступа к этому заказу' }, { status: 403 });
   const { db, order, user, isCleaner } = access;
   const active = trackingStatuses.includes(order.status);
-  const [{ data: address }, { data: locations, error }] = await Promise.all([
+  const [{ data: address }, { data: locations, error }, { data: workday }] = await Promise.all([
     db.from('addresses').select('latitude,longitude').eq('id', order.address_id).maybeSingle(),
     active ? db.from('cleaner_locations').select('cleaner_id,latitude,longitude,heading,speed,recorded_at').eq('order_id', order.id) : Promise.resolve({ data: [], error: null }),
+    isCleaner ? db.from('cleaner_profiles').select('is_available').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   if (error) return NextResponse.json({ error: 'Не удалось загрузить геопозиции' }, { status: 503 });
   const ids = (locations ?? []).map(point => point.cleaner_id);
   const { data: names } = ids.length ? await db.from('profiles').select('id,full_name').in('id', ids) : { data: [] };
-  return NextResponse.json({ order, active, isCleaner, isClient: order.client_id === user.id, userId: user.id,
+  return NextResponse.json({ order, active, isCleaner, canShare: isCleaner ? Boolean(workday?.is_available) : false, isClient: order.client_id === user.id, userId: user.id,
     destination: address?.latitude != null && address.longitude != null ? { latitude: Number(address.latitude), longitude: Number(address.longitude) } : null,
     locations: (locations ?? []).map(point => ({ ...point, latitude: Number(point.latitude), longitude: Number(point.longitude), name: names?.find(name => name.id === point.cleaner_id)?.full_name ?? 'Клинер' })),
   }, { headers: { 'Cache-Control': 'no-store' } });
@@ -36,7 +37,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const access = await trackingAccess((await params).id);
   if (!access || access.order.client_id !== access.user.id || !trackingStatuses.includes(access.order.status)) return NextResponse.json({ error: 'Адрес может отметить только клиент активного заказа' }, { status: 403 });
   const body = await readJsonBody<{ latitude: number; longitude: number }>(request);
-  if (!body || typeof body.latitude !== 'number' || typeof body.longitude !== 'number' || !inAstana(body.latitude, body.longitude)) return NextResponse.json({ error: 'Выберите точку в Астане' }, { status: 400 });
+  if (!body || typeof body.latitude !== 'number' || typeof body.longitude !== 'number' || !Number.isFinite(body.latitude) || !Number.isFinite(body.longitude) || Math.abs(body.latitude) > 90 || Math.abs(body.longitude) > 180) return NextResponse.json({ error: 'Выберите корректную точку адреса' }, { status: 400 });
   const { data, error } = await access.db.from('addresses').update({ latitude: body.latitude, longitude: body.longitude }).eq('id', access.order.address_id).eq('user_id', access.user.id).is('latitude', null).select('id').maybeSingle();
   if (error || !data) return NextResponse.json({ error: 'Точка уже сохранена или адрес недоступен. Обновите страницу.' }, { status: 409 });
   return NextResponse.json({ ok: true });
