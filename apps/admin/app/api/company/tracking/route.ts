@@ -28,6 +28,8 @@ export async function GET() {
   ]);
   const cleanerIds = [...new Set((workers ?? []).map(worker => worker.cleaner_id))];
   const { data: names } = cleanerIds.length ? await db.from('profiles').select('id,full_name').in('id', cleanerIds) : { data: [] };
+  const { data: activeCleaners } = cleanerIds.length ? await db.from('cleaner_profiles').select('user_id').in('user_id', cleanerIds).eq('is_available', true).gt('workday_ends_at', new Date().toISOString()) : { data: [] };
+  const activeIds = new Set((activeCleaners ?? []).map(item => item.user_id));
   const now = Date.now();
   return NextResponse.json({ orders: (orders ?? []).map(order => {
     const address = (addresses ?? []).find(item => item.id === order.address_id);
@@ -37,7 +39,7 @@ export async function GET() {
       destination: address?.latitude != null && address.longitude != null ? { latitude: Number(address.latitude), longitude: Number(address.longitude) } : null,
       cleaners: (workers ?? []).filter(worker => worker.order_id === order.id).map(worker => {
         const point = (points ?? []).find(item => item.order_id === order.id && item.cleaner_id === worker.cleaner_id);
-        const fresh = point && now - Date.parse(point.recorded_at) <= 120_000;
+        const fresh = point && activeIds.has(worker.cleaner_id) && now - Date.parse(point.recorded_at) <= 120_000;
         return { id: worker.cleaner_id, name: (names ?? []).find(item => item.id === worker.cleaner_id)?.full_name ?? 'Клинер', location: fresh ? { latitude: Number(point.latitude), longitude: Number(point.longitude), recordedAt: point.recorded_at } : null };
       }),
     };

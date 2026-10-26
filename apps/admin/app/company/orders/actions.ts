@@ -11,7 +11,7 @@ export async function proposeCompanyPrice(formData: FormData) {
   const cleanerAmountMinor = Math.round(Number(formData.get('cleaner_amount_kzt')) * 100);
   if (!orderId || !Number.isFinite(totalMinor) || totalMinor < 10000) throw new Error('Укажите цену от 100 ₸');
   if (!Number.isInteger(requiredWorkers) || requiredWorkers < 1 || requiredWorkers > 50) throw new Error('Укажите количество клинеров от 1 до 50');
-  if (!Number.isFinite(cleanerAmountMinor) || cleanerAmountMinor < 0) throw new Error('Укажите выплату клинерам');
+  if (!Number.isFinite(cleanerAmountMinor) || cleanerAmountMinor < requiredWorkers * 100) throw new Error('Укажите выплату не менее 1 ₸ каждому клинеру');
   if (cleanerAmountMinor > totalMinor) throw new Error('Выплата клинерам не может превышать цену заказа');
 
   const supabase = await createClient();
@@ -26,8 +26,11 @@ export async function proposeCompanyPrice(formData: FormData) {
   const { data: membership, error: membershipError } = await admin.from('community_companies').select('cleaner_communities(is_active)').eq('company_id', company.id).maybeSingle();
   if (membershipError) throw new Error('Не удалось проверить сообщество клинеров');
   if (!(membership?.cleaner_communities as unknown as { is_active: boolean } | null)?.is_active) throw new Error('Сначала подключите активное сообщество клинеров в кабинете компании');
-  const { data: order } = await admin.from('orders').select('id,client_id,status,price_confirmed_at').eq('id', orderId).eq('selected_company_id', company.id).in('status', ['searching', 'offered']).maybeSingle();
+  const { data: order } = await admin.from('orders').select('id,client_id,status,price_confirmed_at,service_id').eq('id', orderId).eq('selected_company_id', company.id).in('status', ['searching', 'offered']).maybeSingle();
   if (!order || order.price_confirmed_at) throw new Error('Цена уже подтверждена клиентом');
+  const { data: service, error: serviceError } = await admin.from('cleaning_services').select('base_price_minor').eq('id', order.service_id).single();
+  if (serviceError || !service) throw new Error('Не удалось проверить базовую цену услуги');
+  if (totalMinor < Number(service.base_price_minor)) throw new Error(`Цена не может быть ниже базовой: ${(Number(service.base_price_minor) / 100).toLocaleString('ru-RU')} ₸`);
   const { error: priceError } = await admin.from('orders').update({
     subtotal_minor: totalMinor,
     total_minor: totalMinor,
@@ -56,7 +59,7 @@ export async function publishCompanyOrder(formData: FormData) {
   const requiredWorkers = Number(formData.get('required_workers'));
   const cleanerAmountMinor = Math.round(Number(formData.get('cleaner_amount_kzt')) * 100);
   if (!orderId || !Number.isInteger(requiredWorkers) || requiredWorkers < 1 || requiredWorkers > 50) throw new Error('Укажите количество сотрудников от 1 до 50');
-  if (!Number.isFinite(cleanerAmountMinor) || cleanerAmountMinor < 0) throw new Error('Укажите выплату клинерам');
+  if (!Number.isFinite(cleanerAmountMinor) || cleanerAmountMinor < requiredWorkers * 100) throw new Error('Укажите выплату не менее 1 ₸ каждому клинеру');
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -85,7 +88,7 @@ export async function updatePublishedOrder(formData: FormData) {
   const requiredWorkers = Number(formData.get('required_workers'));
   const cleanerAmountMinor = Math.round(Number(formData.get('cleaner_amount_kzt')) * 100);
   if (!orderId || !Number.isInteger(requiredWorkers) || requiredWorkers < 1 || requiredWorkers > 50) throw new Error('Укажите количество сотрудников от 1 до 50');
-  if (!Number.isFinite(cleanerAmountMinor) || cleanerAmountMinor < 0) throw new Error('Укажите выплату клинерам');
+  if (!Number.isFinite(cleanerAmountMinor) || cleanerAmountMinor < requiredWorkers * 100) throw new Error('Укажите выплату не менее 1 ₸ каждому клинеру');
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

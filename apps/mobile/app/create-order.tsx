@@ -63,7 +63,7 @@ export default function CreateOrder() {
     void Promise.all([
       supabase.from('cleaning_services').select('id,name,base_price_minor').eq('is_active', true).order('sort_order'),
       supabase.from('client_profiles').select('preferred_company_id,company_locked,company_profiles!preferred_company_id(id,name,rating,reviews_count,cashback_bps)').eq('user_id', profile.id).single(),
-      supabase.from('cleaner_profiles').select('user_id,rating,reviews_count,work_zone,profiles!user_id(full_name)').eq('verification_status', 'approved').eq('is_available', true).order('rating', { ascending: false }),
+      supabase.from('cleaner_profiles').select('user_id,rating,reviews_count,work_zone,profiles!user_id(full_name)').eq('verification_status', 'approved').eq('is_available', true).gt('workday_ends_at', new Date().toISOString()).order('rating', { ascending: false }),
     ]).then(([servicesResult, companyResult, cleanersResult]) => {
       if (servicesResult.data?.[0]) {
         setServices(servicesResult.data);

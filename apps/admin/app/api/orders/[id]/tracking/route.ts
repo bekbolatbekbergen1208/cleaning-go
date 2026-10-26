@@ -10,14 +10,16 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const [{ data: address }, { data: locations, error }, { data: workday }] = await Promise.all([
     db.from('addresses').select('latitude,longitude').eq('id', order.address_id).maybeSingle(),
     active ? db.from('cleaner_locations').select('cleaner_id,latitude,longitude,heading,speed,recorded_at').eq('order_id', order.id) : Promise.resolve({ data: [], error: null }),
-    isCleaner ? db.from('cleaner_profiles').select('is_available').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
+    isCleaner ? db.from('cleaner_profiles').select('is_available,workday_ends_at').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   if (error) return NextResponse.json({ error: 'Не удалось загрузить геопозиции' }, { status: 503 });
   const ids = (locations ?? []).map(point => point.cleaner_id);
+  const { data: activeCleaners } = ids.length ? await db.from('cleaner_profiles').select('user_id').in('user_id', ids).eq('is_available', true).gt('workday_ends_at', new Date().toISOString()) : { data: [] };
+  const activeIds = new Set((activeCleaners ?? []).map(cleaner => cleaner.user_id));
   const { data: names } = ids.length ? await db.from('profiles').select('id,full_name').in('id', ids) : { data: [] };
-  return NextResponse.json({ order, active, isCleaner, canShare: isCleaner ? Boolean(workday?.is_available) : false, isClient: order.client_id === user.id, userId: user.id,
+  return NextResponse.json({ order, active, isCleaner, canShare: isCleaner ? Boolean(workday?.is_available && workday.workday_ends_at && Date.parse(workday.workday_ends_at) > Date.now()) : false, isClient: order.client_id === user.id, userId: user.id,
     destination: address?.latitude != null && address.longitude != null ? { latitude: Number(address.latitude), longitude: Number(address.longitude) } : null,
-    locations: (locations ?? []).map(point => ({ ...point, latitude: Number(point.latitude), longitude: Number(point.longitude), name: names?.find(name => name.id === point.cleaner_id)?.full_name ?? 'Клинер' })),
+    locations: (locations ?? []).filter(point => activeIds.has(point.cleaner_id) && Date.now() - Date.parse(point.recorded_at) <= 120_000).map(point => ({ ...point, latitude: Number(point.latitude), longitude: Number(point.longitude), name: names?.find(name => name.id === point.cleaner_id)?.full_name ?? 'Клинер' })),
   }, { headers: { 'Cache-Control': 'no-store' } });
 }
 

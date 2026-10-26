@@ -10,6 +10,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     access.db.from('cleaner_locations').select('latitude,longitude,recorded_at').eq('order_id', access.order.id).eq('cleaner_id', cleanerId).maybeSingle(),
     access.db.from('addresses').select('latitude,longitude').eq('id', access.order.address_id).maybeSingle(),
   ]);
+  const { data: workday } = await access.db.from('cleaner_profiles').select('is_available,workday_ends_at').eq('user_id', cleanerId).maybeSingle();
+  if (!workday?.is_available || !workday.workday_ends_at || Date.parse(workday.workday_ends_at) <= Date.now()) return NextResponse.json({ error: 'Рабочий день клинера завершён' }, { status: 409 });
   if (!point || !address || address.latitude == null || address.longitude == null || Date.now() - Date.parse(point.recorded_at) > 120_000) return NextResponse.json({ error: 'Для маршрута нужны актуальная геопозиция и точка адреса' }, { status: 409 });
   const start: [number, number] = [Number(point.longitude), Number(point.latitude)];
   const end: [number, number] = [Number(address.longitude), Number(address.latitude)];

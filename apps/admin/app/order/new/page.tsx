@@ -36,6 +36,7 @@ export default async function NewOrderPage() {
       .select('user_id,rating,reviews_count,work_zone,profiles!user_id(full_name,status)')
       .eq('verification_status', 'approved')
       .eq('is_available', true)
+      .gt('workday_ends_at', new Date().toISOString())
       .order('rating', { ascending: false }),
   ]);
 

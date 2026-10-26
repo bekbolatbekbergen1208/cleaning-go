@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Icon } from '../components/icon';
+import { createClient } from '../lib/supabase/client';
 
 const adminLinks = [
   ['/admin', 'Обзор'],
@@ -28,6 +29,14 @@ const companyLinks = [
 export function SiteHeader() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  useEffect(() => {
+    const auth = createClient().auth;
+    let active = true;
+    void auth.getUser().then(({ data }) => { if (active) setLoggedIn(Boolean(data.user)); });
+    const { data: subscription } = auth.onAuthStateChange((_event, session) => setLoggedIn(Boolean(session)));
+    return () => { active = false; subscription.subscription.unsubscribe(); };
+  }, []);
   const isAdminLogin = pathname === '/admin/login';
   const isAdmin =
     !isAdminLogin &&
@@ -124,12 +133,12 @@ export function SiteHeader() {
                 <a href="/#services">Услуги</a>
                 <a href="/#how">Как это работает</a>
                 <Link href="/profile">Профиль</Link>
-                <Link href="/login">Войти</Link>
+                {loggedIn === false && <Link href="/login">Войти</Link>}
                 <Link href="/order/new" className="header-order-button">
                   Заказать уборку <Icon name="arrow" width="18" height="18" />
                 </Link>
               </nav>
-              {!isAdminLogin && (
+              {!isAdminLogin && (isAuth || loggedIn === false) && (
                 <Link
                   href={isAuth ? '/' : '/login'}
                   className="mobile-register-button"

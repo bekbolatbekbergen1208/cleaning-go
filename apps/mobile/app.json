@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Cleaning Go", "slug": "cleaning-go", "scheme": "cleaninggo", "version": "0.1.0", "orientation": "portrait",
-    "userInterfaceStyle": "light", "plugins": ["expo-router", "expo-secure-store", ["expo-location", { "locationWhenInUsePermission": "Cleaning Go использует геолокацию только во время активного заказа." }]],
+    "userInterfaceStyle": "light", "plugins": ["expo-router", "expo-secure-store", ["expo-location", { "locationWhenInUsePermission": "Cleaning Go показывает клиенту и компании местоположение клинера во время активного заказа и рабочей смены.", "locationAlwaysAndWhenInUsePermission": "Cleaning Go передаёт местоположение клинера в фоне во время активного заказа до окончания рабочей смены.", "isIosBackgroundLocationEnabled": true, "isAndroidBackgroundLocationEnabled": true }]],
     "experiments": { "typedRoutes": true }, "ios": { "supportsTablet": true }, "android": { "adaptiveIcon": { "backgroundColor": "#E7F7F3" } },
     "web": { "bundler": "metro", "output": "static", "name": "Cleaning Go", "shortName": "Cleaning Go", "themeColor": "#087562", "backgroundColor": "#f8fafc", "display": "standalone" }
   }

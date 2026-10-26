@@ -30,7 +30,7 @@ export default async function CleanerCompanyOrders() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const [{ data: cleaner }, { data: ownWork }, { data: communityMember }] = await Promise.all([
-    admin.from('cleaner_profiles').select('verification_status,is_available,work_zone').eq('user_id', user.id).maybeSingle(),
+    admin.from('cleaner_profiles').select('verification_status,is_available,work_zone,workday_ends_at').eq('user_id', user.id).maybeSingle(),
     admin.from('order_workers').select('order_id').eq('cleaner_id', user.id),
     admin.from('community_cleaners').select('community_id,cleaner_communities(name,is_active)').eq('cleaner_id', user.id).maybeSingle(),
   ]);
@@ -50,7 +50,7 @@ export default async function CleanerCompanyOrders() {
   const { data: workers } = orderIds.length ? await admin.from('order_workers').select('order_id,cleaner_id').in('order_id', orderIds) : { data: [] };
   const workersByOrder = new Map<string, { order_id: string; cleaner_id: string }[]>();
   for (const worker of workers ?? []) workersByOrder.set(worker.order_id, [...(workersByOrder.get(worker.order_id) ?? []), worker]);
-  const canClaim = cleaner.verification_status === 'approved' && cleaner.is_available;
+  const canClaim = cleaner.verification_status === 'approved' && cleaner.is_available && Boolean(cleaner.workday_ends_at && Date.parse(cleaner.workday_ends_at) > Date.now());
   if (!canClaim) redirect('/profile');
   const companyName = (communityMember.cleaner_communities as unknown as {name?:string}|null)?.name ?? 'Сообщество клинеров';
 

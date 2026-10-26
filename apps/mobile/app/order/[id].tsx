@@ -3,7 +3,7 @@ import { Button, Card, Field, Screen, Title, formatMoney, s } from '@/components
 import { supabase } from '@/lib/supabase';
 import { useSessionStore } from '@/store/session';
 import type { Order, OrderStatus } from '@cleaning-go/types';
-import * as Location from 'expo-location';
+import { isTrackingOrder, startOrderTracking, stopOrderTracking } from '@/lib/background-location';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Linking, Text, View } from 'react-native';
@@ -23,7 +23,7 @@ export default function OrderDetail() {
   const updateDemo = useSessionStore(state => state.updateDemoOrderStatus);
   const demo = process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
   const [order, setOrder] = useState<Order | undefined>(demo ? demoOrders.find(item => item.id === id) : undefined);
-  const [points, setPoints] = useState<Point[]>([]); const [rating, setRating] = useState('5'); const [review, setReview] = useState('');
+  const [tracking, setTracking] = useState(false); const [points, setPoints] = useState<Point[]>([]); const [rating, setRating] = useState('5'); const [review, setReview] = useState('');
   const executor = role === 'cleaner' || role === 'company_cleaner' || role === 'company_owner';
   const isCleaner = role === 'cleaner' || role === 'company_cleaner';
 
@@ -35,7 +35,7 @@ export default function OrderDetail() {
 
   async function loadPoints() {
     const { data } = await supabase.from('cleaner_locations').select('cleaner_id,latitude,longitude,recorded_at').eq('order_id', id);
-    setPoints((data ?? []) as Point[]);
+    setPoints(((data ?? []) as Point[]).filter(point => Date.now() - Date.parse(point.recorded_at) <= 120_000));
   }
 
   useEffect(() => {
@@ -44,24 +44,31 @@ export default function OrderDetail() {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${id}` }, payload => setOrder(payload.new as Order))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cleaner_locations', filter: `order_id=eq.${id}` }, () => void loadPoints()).subscribe();
     void loadPoints();
-    return () => { void supabase.removeChannel(channel); };
+    const poll = setInterval(() => void loadPoints(), 10_000);
+    return () => { clearInterval(poll); void supabase.removeChannel(channel); };
   }, [id, demo, demoOrders]);
 
   useEffect(() => {
-    if (demo || !isCleaner || !order || !trackingStatuses.includes(order.status)) return;
-    let watcher: Location.LocationSubscription | undefined; let cancelled = false;
-    void (async () => {
-      const permission = await Location.requestForegroundPermissionsAsync(); if (permission.status !== 'granted' || cancelled) return;
-      watcher = await Location.watchPositionAsync({ accuracy: Location.Accuracy.High, timeInterval: 15_000, distanceInterval: 10 }, location => {
-        void supabase.rpc('update_cleaner_location', { target_order_id: id, lat: location.coords.latitude, lng: location.coords.longitude, target_heading: location.coords.heading, target_speed: location.coords.speed });
-      });
-    })();
-    return () => { cancelled = true; watcher?.remove(); };
-  }, [demo, id, isCleaner, order?.status]);
+    if (demo || !isCleaner || !id) return;
+    void isTrackingOrder(id).then(setTracking);
+  }, [demo, id, isCleaner]);
+
+  useEffect(() => {
+    if (demo || !isCleaner || !tracking || !order || trackingStatuses.includes(order.status)) return;
+    void stopOrderTracking().then(() => setTracking(false));
+  }, [demo, isCleaner, tracking, order?.status]);
+
+  async function toggleTracking() {
+    try {
+      if (tracking) { await stopOrderTracking(); setTracking(false); }
+      else { await startOrderTracking(id); setTracking(true); }
+    } catch (error) {
+      Alert.alert('Геолокация', error instanceof Error ? error.message : 'Не удалось запустить отслеживание.');
+    }
+  }
 
   async function transition(status: OrderStatus) {
     if (demo) { updateDemo(id, status); setOrder(current => current ? { ...current, status } : current); return; }
-    if (status === 'on_the_way') { const permission = await Location.requestForegroundPermissionsAsync(); if (permission.status !== 'granted') return Alert.alert('Нужно разрешение', 'Разрешите геолокацию для запуска маршрута.'); }
     const { error } = await supabase.rpc('transition_order_status', { target_order_id: id, next_status: status, note: null });
     if (error) return Alert.alert('Переход недоступен', error.message);
     void load();
@@ -69,7 +76,7 @@ export default function OrderDetail() {
       const destination = [order?.city, order?.address_text].filter(Boolean).join(', ');
       const twoGisUrl = `https://2gis.kz/search/${encodeURIComponent(destination)}`;
       const opened = await Linking.openURL(twoGisUrl).then(() => true).catch(() => false);
-      if (!opened) Alert.alert('2GIS не открылся', 'Геопозиция всё равно передаётся клиенту через Cleaning Go.');
+      if (!opened) Alert.alert('2GIS не открылся', 'Откройте адрес заказа в навигаторе вручную.');
     }
   }
   async function sendReview() {
@@ -83,6 +90,7 @@ export default function OrderDetail() {
   return <Screen><Title subtitle={`Статус: ${order.status}`}>№ {order.order_number}</Title>
     <Card><Text style={s.cardTitle}>{order.address_text}</Text><Text>{new Date(order.scheduled_at).toLocaleString('ru-KZ')}</Text><Text>{order.area_sq_m} м² · {order.rooms_count} комн.</Text><Text style={s.cardTitle}>{formatMoney(order.total_minor)}</Text></Card>
     {trackingStatuses.includes(order.status) && points.length ? points.map(point => <Card key={point.cleaner_id}><Text style={s.cardTitle}>Клинер на карте 2GIS</Text><TwoGisMap latitude={point.latitude} longitude={point.longitude} /><Text style={s.muted}>Обновлено {new Date(point.recorded_at).toLocaleTimeString('ru-KZ')}</Text><Button title="Открыть в 2GIS" variant="secondary" onPress={() => void Linking.openURL(`https://2gis.kz/search/${point.latitude},${point.longitude}`)} /></Card>) : trackingStatuses.includes(order.status) ? <Card><Text>Ожидаем первую точку геолокции…</Text></Card> : null}
+    {isCleaner && trackingStatuses.includes(order.status) && !demo ? <Card><Text style={s.cardTitle}>Передача геолокации</Text><Text style={s.muted}>Доступна участникам заказа и компании до конца рабочей смены. Для работы при заблокированном экране разрешите геолокацию в фоне.</Text><Button title={tracking ? 'Остановить передачу GPS' : 'Начать передачу GPS в фоне'} variant={tracking ? 'danger' : 'primary'} onPress={() => void toggleTracking()} /></Card> : null}
     {showAction ? <Button title={action.label} onPress={() => void transition(action.status)} /> : null}
     {!executor && ['created', 'searching'].includes(order.status) ? <Button title="Отменить заказ" variant="danger" onPress={() => void transition('cancelled')} /> : null}
     {!executor && order.status === 'completed' ? <Card><Text style={s.cardTitle}>Оцените уборку</Text><View style={s.row}>{[1,2,3,4,5].map(value => <Button key={value} title={String(value)} variant={rating === String(value) ? 'primary' : 'secondary'} onPress={() => setRating(String(value))} />)}</View><Field label="Отзыв" value={review} onChangeText={setReview} /><Button title="Опубликовать отзыв" onPress={() => void sendReview()} /></Card> : null}

@@ -97,7 +97,7 @@ export default async function ProfilePage() {
   );
   const isCleaner =
     profile?.role === 'cleaner' || profile?.role === 'company_cleaner';
-  const { data: cleanerAvailability } = isCleaner ? await supabase.from('cleaner_profiles').select('is_available').eq('user_id', user.id).maybeSingle() : { data: null };
+  const { data: cleanerAvailability } = isCleaner ? await supabase.from('cleaner_profiles').select('is_available,workday_ends_at').eq('user_id', user.id).maybeSingle() : { data: null };
   const { data: membership, error: membershipError } = isCleaner
     ? await supabase
         .from('community_cleaners')
@@ -220,7 +220,7 @@ export default async function ProfilePage() {
             </Link>
           </div>
         )}
-        {isCleaner && <WorkdayToggle active={Boolean(cleanerAvailability?.is_available)} />}
+        {isCleaner && <WorkdayToggle active={Boolean(cleanerAvailability?.is_available && cleanerAvailability.workday_ends_at && Date.parse(cleanerAvailability.workday_ends_at) > Date.now())} endsAt={cleanerAvailability?.workday_ends_at ?? null} />}
         {isCleaner && (
           <section className="mt-6 rounded-xl bg-emerald-50 p-4">
             <h2 className="font-black">Моё сообщество</h2>

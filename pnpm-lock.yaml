@@ -127,6 +127,9 @@ importers:
       expo-status-bar:
         specifier: ~2.2.3
         version: 2.2.3(react-native@0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0))(react@19.0.0)
+      expo-task-manager:
+        specifier: ~13.1.6
+        version: 13.1.6(expo@53.0.27(@babel/core@7.29.7)(@expo/metro-runtime@5.0.5(react-native@0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0)))(react-native-webview@13.13.5(react-native@0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0))(react@19.0.0))(react-native@0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0))(react@19.0.0))(react-native@0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0))
       react:
         specifier: 19.0.0
         version: 19.0.0
@@ -1982,10 +1985,12 @@ packages:
   '@xmldom/xmldom@0.8.13':
     resolution: {integrity: sha512-KRYzxepc14G/CEpEGc3Yn+JKaAeT63smlDr+vjB8jRfgTBBI9wRj/nkQEO+ucV8p8I9bfKLWp37uHgFrbntPvw==}
     engines: {node: '>=10.0.0'}
+    deprecated: this version has critical issues, please update to the latest version
 
   '@xmldom/xmldom@0.9.10':
     resolution: {integrity: sha512-A9gOqLdi6cV4ibazAjcQufGj0B1y/vDqYrcuP6d/6x8P27gRS8643Dj9o1dEKtB6O7fwxb2FgBmJS2mX7gpvdw==}
     engines: {node: '>=14.6'}
+    deprecated: this version has critical issues, please update to the latest version
 
   abort-controller@3.0.0:
     resolution: {integrity: sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg==}
@@ -2904,6 +2909,12 @@ packages:
     resolution: {integrity: sha512-+c8R3AESBoduunxTJ8353SqKAKpxL6DvcD8VKBuh81zzJyUUbfB4CVjr1GufSJEKsMzNPXZU+HJwXx7Xh7lx8Q==}
     peerDependencies:
       react: '*'
+      react-native: '*'
+
+  expo-task-manager@13.1.6:
+    resolution: {integrity: sha512-sYNAftpIeZ+j6ur17Jo0OpSTk9ks/MDvTbrNCimXMyjIt69XXYL/kAPYf76bWuxOuN8bcJ8Ef8YvihkwFG9hDA==}
+    peerDependencies:
+      expo: '*'
       react-native: '*'
 
   expo@53.0.27:
@@ -4170,6 +4181,7 @@ packages:
 
   react-native-edge-to-edge@1.6.0:
     resolution: {integrity: sha512-2WCNdE3Qd6Fwg9+4BpbATUxCLcouF6YRY7K+J36KJ4l3y+tWN6XCqAC4DuoGblAAbb2sLkhEDp4FOlbOIot2Og==}
+    deprecated: This package is deprecated. Set edgeToEdgeEnabled=true in android/gradle.properties instead.
     peerDependencies:
       react: '*'
       react-native: '*'
@@ -4794,6 +4806,9 @@ packages:
   unicode-property-aliases-ecmascript@2.2.0:
     resolution: {integrity: sha512-hpbDzxUY9BFwX+UeBnxv3Sh1q7HFxj48DTmXchNgRa46lO8uj3/1iEn3MiNUYTg1g9ctIqXCCERn8gYZhHC5lQ==}
     engines: {node: '>=4'}
+
+  unimodules-app-loader@5.1.3:
+    resolution: {integrity: sha512-nPUkwfkpJWvdOQrVvyQSUol93/UdmsCVd9Hkx9RgAevmKSVYdZI+S87W73NGKl6QbwK9L1BDSY5OrQuo8Oq15g==}
 
   unique-string@2.0.0:
     resolution: {integrity: sha512-uNaeirEPvpZWSgzwsPGtU2zVSTrn/8L5q/IexZmH0eH6SA73CmAA5U4GwORTxQAZs95TAXLNqeLoPPNO5gZfWg==}
@@ -7925,7 +7940,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-module-utils@2.14.0(@typescript-eslint/parser@8.67.0(eslint@9.39.5(jiti@1.21.7))(typescript@5.8.3))(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.5(jiti@1.21.7)):
+  eslint-module-utils@2.14.0(@typescript-eslint/parser@8.67.0(eslint@9.39.5(jiti@1.21.7))(typescript@5.8.3))(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0)(eslint@9.39.5(jiti@1.21.7)))(eslint@9.39.5(jiti@1.21.7)):
     dependencies:
       debug: 3.2.7
     optionalDependencies:
@@ -7956,7 +7971,7 @@ snapshots:
       doctrine: 2.1.0
       eslint: 9.39.5(jiti@1.21.7)
       eslint-import-resolver-node: 0.3.10
-      eslint-module-utils: 2.14.0(@typescript-eslint/parser@8.67.0(eslint@9.39.5(jiti@1.21.7))(typescript@5.8.3))(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.5(jiti@1.21.7))
+      eslint-module-utils: 2.14.0(@typescript-eslint/parser@8.67.0(eslint@9.39.5(jiti@1.21.7))(typescript@5.8.3))(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0)(eslint@9.39.5(jiti@1.21.7)))(eslint@9.39.5(jiti@1.21.7))
       hasown: 2.0.4
       is-core-module: 2.16.2
       is-glob: 4.0.3
@@ -8211,6 +8226,12 @@ snapshots:
       react-native: 0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0)
       react-native-edge-to-edge: 1.6.0(react-native@0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0))(react@19.0.0)
       react-native-is-edge-to-edge: 1.3.1(react-native@0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0))(react@19.0.0)
+
+  expo-task-manager@13.1.6(expo@53.0.27(@babel/core@7.29.7)(@expo/metro-runtime@5.0.5(react-native@0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0)))(react-native-webview@13.13.5(react-native@0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0))(react@19.0.0))(react-native@0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0))(react@19.0.0))(react-native@0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0)):
+    dependencies:
+      expo: 53.0.27(@babel/core@7.29.7)(@expo/metro-runtime@5.0.5(react-native@0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0)))(react-native-webview@13.13.5(react-native@0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0))(react@19.0.0))(react-native@0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0))(react@19.0.0)
+      react-native: 0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0)
+      unimodules-app-loader: 5.1.3
 
   expo@53.0.27(@babel/core@7.29.7)(@expo/metro-runtime@5.0.5(react-native@0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0)))(react-native-webview@13.13.5(react-native@0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0))(react@19.0.0))(react-native@0.79.5(@babel/core@7.29.7)(@types/react@19.0.10)(react@19.0.0))(react@19.0.0):
     dependencies:
@@ -10348,6 +10369,8 @@ snapshots:
   unicode-match-property-value-ecmascript@2.2.1: {}
 
   unicode-property-aliases-ecmascript@2.2.0: {}
+
+  unimodules-app-loader@5.1.3: {}
 
   unique-string@2.0.0:
     dependencies:

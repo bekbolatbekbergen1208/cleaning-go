@@ -43,9 +43,12 @@ export default async function CompanyOrders() {
 
   const { data: orders, error } = await admin
     .from('orders')
-    .select('id,order_number,status,address_text,city,scheduled_at,area_sq_m,rooms_count,total_minor,executor_amount_minor,required_workers,price_confirmed_at,photo_urls,created_at,profiles!orders_client_id_fkey(full_name,phone)')
+    .select('id,order_number,status,service_id,address_text,city,scheduled_at,area_sq_m,rooms_count,total_minor,executor_amount_minor,required_workers,price_confirmed_at,photo_urls,created_at,profiles!orders_client_id_fkey(full_name,phone)')
     .eq('selected_company_id', company.id)
     .order('created_at', { ascending: false });
+
+  const { data: services } = await admin.from('cleaning_services').select('id,base_price_minor');
+  const serviceMinimums = new Map((services ?? []).map(service => [service.id, Number(service.base_price_minor) / 100]));
 
   const { data: membership } = await admin.from('community_companies').select('cleaner_communities(is_active)').eq('company_id', company.id).maybeSingle();
   const communityReady = Boolean((membership?.cleaner_communities as unknown as { is_active: boolean } | null)?.is_active);
@@ -60,6 +63,7 @@ export default async function CompanyOrders() {
       const client = order.profiles as unknown as { full_name?: string; phone?: string } | null;
       const phone = contactPhone(client?.phone);
       const waitingForClient = order.status === 'offered' && !order.price_confirmed_at;
+      const minimumPrice = Math.max(100, serviceMinimums.get(order.service_id) ?? 100);
       return <article className="card" key={order.id}>{['accepted', 'on_the_way', 'arrived', 'in_progress'].includes(order.status) && <Link className="mb-4 inline-flex rounded-xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700" href={`/order/${order.id}/tracking`}>Карта и местоположение клинеров →</Link>}
         <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-black">Заказ {order.order_number}</h2><p className="mt-1 text-sm text-slate-500">{client?.full_name ?? 'Клиент'} · {client?.phone ?? 'телефон не указан'}</p>{phone && <div className="mt-3 flex flex-wrap gap-2"><a className="rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white" href={`https://wa.me/${phone}?text=${encodeURIComponent(`Здравствуйте! Пишем по вашему заказу ${order.order_number} в Cleaning Go.`)}`} target="_blank" rel="noreferrer">Написать в WhatsApp</a><a className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white" href={`tel:+${phone}`}>Позвонить</a></div>}</div><span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">{statusNames[order.status] ?? order.status}</span></div>
         <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2"><p><b>Адрес:</b> {order.city}, {order.address_text}</p><p><b>Дата:</b> {new Date(order.scheduled_at).toLocaleString('ru-KZ')}</p><p><b>Помещение:</b> {order.area_sq_m} м², {order.rooms_count} комн.</p><p><b>Сумма:</b> {(Number(order.total_minor) / 100).toLocaleString('ru-RU')} ₸</p></div>
@@ -67,15 +71,15 @@ export default async function CompanyOrders() {
         {order.status === 'searching' && !communityReady && <p className="mt-5 rounded-xl bg-amber-50 p-4 text-sm font-semibold text-amber-800">Чтобы отправить цену и затем передать заказ клинерам, <Link href="/company" className="underline">подключите активное сообщество</Link>.</p>}
         {order.status === 'searching' && communityReady ? <form action={proposeCompanyPrice} className="mt-5 grid gap-3 rounded-2xl bg-emerald-50 p-4 sm:grid-cols-3">
           <input type="hidden" name="order_id" value={order.id}/>
-          <label className="text-sm font-bold text-emerald-900">Цена для клиента, ₸<input className="input mt-1 bg-white" name="total_kzt" type="number" min="100" step="1" required/></label>
+          <label className="text-sm font-bold text-emerald-900">Цена для клиента, ₸<input className="input mt-1 bg-white" name="total_kzt" type="number" min={minimumPrice} step="1" required/></label>
           <label className="text-sm font-bold text-emerald-900">Количество клинеров<input className="input mt-1 bg-white" name="required_workers" type="number" min="1" max="50" defaultValue="1" required/></label>
-          <label className="text-sm font-bold text-emerald-900">Общая выплата клинерам, ₸<input className="input mt-1 bg-white" name="cleaner_amount_kzt" type="number" min="0" required/></label>
+          <label className="text-sm font-bold text-emerald-900">Общая выплата клинерам, ₸<input className="input mt-1 bg-white" name="cleaner_amount_kzt" type="number" min="1" required/></label>
           <p className="text-sm text-emerald-700 sm:col-span-3">Когда клиент подтвердит цену, заказ сразу появится у клинеров.</p>
           <button className="button sm:col-span-3">Отправить цену клиенту</button>
         </form> : waitingForClient ? <div className="mt-4 rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-700"><p>Ожидаем подтверждения цены клиентом</p><p className="mt-1">Клинеров: {order.required_workers} · Выплата: {(Number(order.executor_amount_minor) / 100).toLocaleString('ru-RU')} ₸</p></div> : order.status === 'accepted' ? <form action={updatePublishedOrder} className="mt-5 grid gap-3 rounded-2xl bg-blue-50 p-4 sm:grid-cols-2">
           <input type="hidden" name="order_id" value={order.id}/><p className="font-bold text-blue-700 sm:col-span-2">Заказ опубликован в общем сообществе клинеров</p>
           <label className="text-sm font-bold text-blue-900">Количество клинеров<input className="input mt-1 bg-white" name="required_workers" type="number" min="1" max="50" defaultValue={order.required_workers ?? 1} required/></label>
-          <label className="text-sm font-bold text-blue-900">Общая выплата клинерам, ₸<input className="input mt-1 bg-white" name="cleaner_amount_kzt" type="number" min="0" max={Number(order.total_minor)/100} defaultValue={Number(order.executor_amount_minor)/100} required/></label>
+          <label className="text-sm font-bold text-blue-900">Общая выплата клинерам, ₸<input className="input mt-1 bg-white" name="cleaner_amount_kzt" type="number" min="1" max={Number(order.total_minor)/100} defaultValue={Number(order.executor_amount_minor)/100} required/></label>
           <p className="text-sm text-blue-700 sm:col-span-2">Выплата одному клинеру будет рассчитана из общей суммы.</p><button className="button sm:col-span-2">Сохранить количество и выплату</button>
         </form> : null}
       </article>;
