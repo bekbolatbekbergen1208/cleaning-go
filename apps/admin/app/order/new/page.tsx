@@ -1,12 +1,12 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '../../../lib/supabase/server';
+import { createClient } from '../../../lib/backend/server';
 import { OrderForm } from './order-form';
 
 export default async function NewOrderPage() {
-  const supabase = await createClient();
+  const backend = await createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await backend.auth.getUser();
   if (!user) redirect('/login');
 
   const [
@@ -16,22 +16,22 @@ export default async function NewOrderPage() {
     { data: bonuses },
     { data: cleaners },
   ] = await Promise.all([
-    supabase.from('profiles').select('role,status').eq('id', user.id).single(),
-    supabase
+    backend.from('profiles').select('role,status,city').eq('id', user.id).single(),
+    backend
       .from('cleaning_services')
       .select('id,name,description,base_price_minor')
       .eq('is_active', true)
       .order('sort_order'),
-    supabase
+    backend
       .from('client_profiles')
       .select('preferred_company_id,company_locked')
       .eq('user_id', user.id)
       .maybeSingle(),
-    supabase
+    backend
       .from('company_bonus_balances')
       .select('company_id,balance_minor')
       .eq('client_id', user.id),
-    supabase
+    backend
       .from('cleaner_profiles')
       .select('user_id,rating,reviews_count,work_zone,profiles!user_id(full_name,status)')
       .eq('verification_status', 'approved')
@@ -43,12 +43,14 @@ export default async function NewOrderPage() {
   if (profile?.role !== 'client' || profile.status !== 'active')
     redirect('/profile');
 
+  if (!clientProfile?.preferred_company_id) redirect('/profile/company');
+
   // A linked company must be loaded even if an administrator changed its status
   // after the invitation code was applied. Otherwise the UI incorrectly reports
   // that the company disappeared and gives the client no useful explanation.
   const companyFields =
     'id,name,rating,reviews_count,service_cities,verification_status';
-  const { data: approvedCompanies, error: companiesError } = await supabase
+  const { data: approvedCompanies, error: companiesError } = await backend
     .from('company_profiles')
     .select(companyFields)
     .eq('verification_status', 'approved')
@@ -63,7 +65,7 @@ export default async function NewOrderPage() {
     preferredCompanyId &&
     !approvedCompanies?.some((company) => company.id === preferredCompanyId)
   ) {
-    const { data, error } = await supabase
+    const { data, error } = await backend
       .from('company_profiles')
       .select(companyFields)
       .eq('id', preferredCompanyId)
@@ -93,6 +95,7 @@ export default async function NewOrderPage() {
         Компания посмотрит фотографию помещения и подтвердит итоговую цену.
       </p>
       <OrderForm
+        initialCity={profile.city ?? ''}
         services={services ?? []}
         companies={companies ?? []}
         cleaners={(cleaners ?? []).flatMap((cleaner) => {

@@ -1,5 +1,5 @@
 import { Button, Card, EmptyState, Screen, Title, formatMoney, s } from '@/components/ui';
-import { supabase } from '@/lib/supabase';
+import { backend } from '@/lib/backend';
 import { useSessionStore } from '@/store/session';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -36,12 +36,12 @@ export default function Reports() {
       return;
     }
     setLoading(true);
-    void supabase.from('orders').select('id,client_id,status,total_minor,executor_amount_minor,company_cashback_minor,created_at,completed_at').order('created_at', { ascending: false }).then(async ({ data }) => {
+    void backend.from('orders').select('id,client_id,status,total_minor,executor_amount_minor,company_cashback_minor,created_at,completed_at').order('created_at', { ascending: false }).then(async ({ data }) => {
       setOrders((data ?? []) as ReportOrder[]);
-      const { data: company } = await supabase.from('company_profiles').select('id').eq('owner_id', profileId!).single();
+      const { data: company } = await backend.from('company_profiles').select('id').eq('owner_id', profileId!).single();
       if (company) {
-        const { data: membership } = await supabase.from('community_companies').select('community_id').eq('company_id', company.id).maybeSingle();
-        const { count } = membership ? await supabase.from('community_cleaners').select('cleaner_id', { count: 'exact', head: true }).eq('community_id', membership.community_id) : { count: 0 };
+        const { data: membership } = await backend.from('community_companies').select('community_id').eq('company_id', company.id).maybeSingle();
+        const { count } = membership ? await backend.from('community_cleaners').select('cleaner_id', { count: 'exact', head: true }).eq('community_id', membership.community_id) : { count: 0 };
         setEmployees(count ?? 0);
       }
       setLoading(false);

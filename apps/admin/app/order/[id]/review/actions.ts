@@ -1,16 +1,16 @@
 'use server';
 
-import { createClient as createAdminClient } from '@supabase/supabase-js';
-import { createClient } from '../../../../lib/supabase/server';
+import { createClient as createAdminClient } from '@cleaning-go/local-client';
+import { createClient } from '../../../../lib/backend/server';
 
 export async function publishReview(orderId: string, rating: number, text: string) {
   if (!orderId || !Number.isInteger(rating) || rating < 1 || rating > 5) return { error: 'Укажите оценку от 1 до 5.' };
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const backend = await createClient();
+  const { data: { user } } = await backend.auth.getUser();
   if (!user) return { error: 'Сначала войдите в аккаунт.' };
 
-  const { error: reviewError } = await supabase.rpc('create_review', {
+  const { error: reviewError } = await backend.rpc('create_review', {
     target_order_id: orderId,
     target_rating: rating,
     target_text: text.trim() || null,
@@ -19,7 +19,7 @@ export async function publishReview(orderId: string, rating: number, text: strin
   const alreadyPublished = reviewError?.code === '23505' || reviewError?.message.includes('reviews_order_id_key');
   if (reviewError && !alreadyPublished) return { error: 'Не удалось опубликовать отзыв. Попробуйте ещё раз.' };
 
-  const admin = createAdminClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  const admin = createAdminClient((process.env.LOCAL_API_URL || 'http://127.0.0.1:54321'), process.env.LOCAL_SERVICE_KEY!, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { data: workers } = await admin.from('order_workers').select('cleaner_id').eq('order_id', orderId);

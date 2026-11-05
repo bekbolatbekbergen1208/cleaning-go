@@ -1,60 +1,153 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@cleaning-go/local-client';
 import { NextRequest, NextResponse } from 'next/server';
-import { bodyIsTooLarge, clientIp, hasJsonContentType, isRateLimited, readJsonBody } from '../../../lib/request-security';
+import {
+  bodyIsTooLarge,
+  clientIp,
+  hasJsonContentType,
+  isRateLimited,
+  readJsonBody,
+} from '../../../lib/request-security';
 
 const roles = new Set(['client', 'cleaner', 'company_owner']);
 
 function corsHeaders(request: NextRequest) {
   const origin = request.headers.get('origin');
-  const allowed = !origin || origin === request.nextUrl.origin || /^https?:\/\/(localhost|127\.0\.0\.1):8081$/.test(origin) || origin === process.env.PUBLIC_APP_URL;
-  return allowed ? { 'Access-Control-Allow-Origin': origin ?? '*', 'Access-Control-Allow-Headers': 'content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS', Vary: 'Origin' } : null;
+  const allowed =
+    !origin ||
+    origin === request.nextUrl.origin ||
+    /^https?:\/\/(localhost|127\.0\.0\.1):8081$/.test(origin) ||
+    origin === process.env.PUBLIC_APP_URL ||
+    (process.env.LOCAL_ALLOWED_ORIGINS || '').split(',').includes(origin);
+  return allowed
+    ? {
+        'Access-Control-Allow-Origin': origin ?? '*',
+        'Access-Control-Allow-Headers': 'content-type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        Vary: 'Origin',
+      }
+    : null;
 }
 
 export async function OPTIONS(request: NextRequest) {
   const headers = corsHeaders(request);
-  return headers ? new NextResponse(null, { status: 204, headers }) : NextResponse.json({ error: 'Origin is not allowed' }, { status: 403 });
+  return headers
+    ? new NextResponse(null, { status: 204, headers })
+    : NextResponse.json({ error: 'Origin is not allowed' }, { status: 403 });
 }
 
 export async function POST(request: NextRequest) {
   const headers = corsHeaders(request);
-  if (!headers) return NextResponse.json({ error: 'Origin is not allowed' }, { status: 403 });
-  if (!hasJsonContentType(request) || bodyIsTooLarge(request)) return NextResponse.json({ error: 'Некорректный запрос.' }, { status: 400, headers });
+  if (!headers)
+    return NextResponse.json(
+      { error: 'Origin is not allowed' },
+      { status: 403 },
+    );
+  if (!hasJsonContentType(request) || bodyIsTooLarge(request))
+    return NextResponse.json(
+      { error: 'Некорректный запрос.' },
+      { status: 400, headers },
+    );
   if (isRateLimited(`register:${clientIp(request)}`, 5, 60 * 60 * 1000)) {
-    return NextResponse.json({ error: 'Слишком много регистраций. Попробуйте позже.' }, { status: 429, headers });
+    return NextResponse.json(
+      { error: 'Слишком много регистраций. Попробуйте позже.' },
+      { status: 429, headers },
+    );
   }
 
   try {
     const body = await readJsonBody<Record<string, unknown>>(request);
-    if (!body) return NextResponse.json({ error: 'Некорректный запрос.' }, { status: 400, headers });
-    const email = String(body.email ?? '').trim().toLowerCase().slice(0, 254);
+    if (!body)
+      return NextResponse.json(
+        { error: 'Некорректный запрос.' },
+        { status: 400, headers },
+      );
+    const email = String(body.email ?? '')
+      .trim()
+      .toLowerCase()
+      .slice(0, 254);
     const password = String(body.password ?? '');
     const role = String(body.role ?? '');
     const fullName = String(body.full_name ?? '').trim();
     const rawPhone = String(body.phone ?? '').trim();
     const digits = rawPhone.replace(/\D/g, '');
-    const phone = digits.length === 11 && digits.startsWith('8') ? `+7${digits.slice(1)}` : `+${digits}`;
-    if (!/^\S+@\S+\.\S+$/.test(email) || !/^\+[1-9]\d{9,14}$/.test(phone) || password.length < 8 || password.length > 256 || fullName.length < 2 || fullName.length > 120 || !roles.has(role)) {
-      return NextResponse.json({ error: 'Проверьте имя, email, номер телефона, пароль и роль.' }, { status: 400, headers });
+    const phone =
+      digits.length === 11 && digits.startsWith('8')
+        ? `+7${digits.slice(1)}`
+        : `+${digits}`;
+    if (
+      !/^\S+@\S+\.\S+$/.test(email) ||
+      !/^\+[1-9]\d{9,14}$/.test(phone) ||
+      password.length < 8 ||
+      password.length > 256 ||
+      fullName.length < 2 ||
+      fullName.length > 120 ||
+      !roles.has(role)
+    ) {
+      return NextResponse.json(
+        { error: 'Проверьте имя, email, номер телефона, пароль и роль.' },
+        { status: 400, headers },
+      );
     }
-    if (role === 'company_owner' && ['company_name', 'company_registration_number', 'company_city', 'company_address', 'company_phone'].some((field) => !String(body[field] ?? '').trim())) {
-      return NextResponse.json({ error: 'Заполните все данные компании.' }, { status: 400, headers });
+    if (
+      role === 'company_owner' &&
+      [
+        'company_name',
+        'company_registration_number',
+        'company_city',
+        'company_address',
+        'company_phone',
+      ].some((field) => !String(body[field] ?? '').trim())
+    ) {
+      return NextResponse.json(
+        { error: 'Заполните все данные компании.' },
+        { status: 400, headers },
+      );
     }
 
-    const admin = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
+    const admin = createClient(
+      process.env.LOCAL_API_URL || 'http://127.0.0.1:54321',
+      process.env.LOCAL_SERVICE_KEY!,
+      { auth: { persistSession: false, autoRefreshToken: false } },
+    );
     const { data: existingProfiles, error: profileLookupError } = await admin
       .from('profiles')
       .select('email,phone')
       .or(`email.ilike.${email},phone.eq.${phone}`)
       .limit(1);
-    if (profileLookupError) return NextResponse.json({ error: 'Не удалось проверить регистрационные данные.' }, { status: 503, headers });
-    if (existingProfiles?.some((item) => item.email?.toLowerCase() === email || item.phone === phone)) {
-      return NextResponse.json({ error: 'Аккаунт с такими данными уже существует.' }, { status: 409, headers });
+    if (profileLookupError)
+      return NextResponse.json(
+        { error: 'Не удалось проверить регистрационные данные.' },
+        { status: 503, headers },
+      );
+    if (
+      existingProfiles?.some(
+        (item) => item.email?.toLowerCase() === email || item.phone === phone,
+      )
+    ) {
+      return NextResponse.json(
+        { error: 'Аккаунт с такими данными уже существует.' },
+        { status: 409, headers },
+      );
     }
     if (role === 'company_owner') {
-      const registrationNumber = String(body.company_registration_number).trim();
-      const { data: existingCompany, error: companyLookupError } = await admin.from('company_profiles').select('id').eq('registration_number', registrationNumber).maybeSingle();
-      if (companyLookupError) return NextResponse.json({ error: 'Не удалось проверить БИН компании.' }, { status: 503, headers });
-      if (existingCompany) return NextResponse.json({ error: 'Компания с таким БИН уже зарегистрирована.' }, { status: 409, headers });
+      const registrationNumber = String(
+        body.company_registration_number,
+      ).trim();
+      const { data: existingCompany, error: companyLookupError } = await admin
+        .from('company_profiles')
+        .select('id')
+        .eq('registration_number', registrationNumber)
+        .maybeSingle();
+      if (companyLookupError)
+        return NextResponse.json(
+          { error: 'Не удалось проверить БИН компании.' },
+          { status: 503, headers },
+        );
+      if (existingCompany)
+        return NextResponse.json(
+          { error: 'Компания с таким БИН уже зарегистрирована.' },
+          { status: 409, headers },
+        );
     }
     const { data, error } = await admin.auth.admin.createUser({
       email,
@@ -68,19 +161,36 @@ export async function POST(request: NextRequest) {
         role,
         referral_code: body.referral_code || undefined,
         company_name: body.company_name || undefined,
-        company_registration_number: body.company_registration_number || undefined,
+        company_registration_number:
+          body.company_registration_number || undefined,
         company_city: body.company_city || undefined,
         company_address: body.company_address || undefined,
         company_phone: body.company_phone || undefined,
       },
     });
     if (error) {
-      console.error('Registration failed:', { code: error.code, status: error.status, message: error.message });
-      return NextResponse.json({ error: error.status === 422 ? 'Пользователь с такими данными уже существует.' : 'Не удалось создать аккаунт.' }, { status: error.status === 422 ? 409 : 400, headers });
+      console.error('Registration failed:', {
+        code: error.code,
+        status: error.status,
+        message: error.message,
+      });
+      return NextResponse.json(
+        {
+          error:
+            error.status === 422
+              ? 'Пользователь с такими данными уже существует.'
+              : 'Не удалось создать аккаунт.',
+        },
+        { status: error.status === 422 ? 409 : 400, headers },
+      );
     }
     if (role === 'client' && body.referral_code) {
       const code = String(body.referral_code).trim().toUpperCase();
-      const { data: company } = await admin.from('company_profiles').select('id,owner_id').eq('company_code', code).maybeSingle();
+      const { data: company } = await admin
+        .from('company_profiles')
+        .select('id,owner_id')
+        .eq('company_code', code)
+        .maybeSingle();
       if (company) {
         await admin.from('notifications').insert({
           user_id: company.owner_id,
@@ -91,8 +201,14 @@ export async function POST(request: NextRequest) {
         });
       }
     }
-    return NextResponse.json({ userId: data.user.id }, { status: 201, headers });
+    return NextResponse.json(
+      { userId: data.user.id },
+      { status: 201, headers },
+    );
   } catch {
-    return NextResponse.json({ error: 'Не удалось обработать регистрацию.' }, { status: 500, headers });
+    return NextResponse.json(
+      { error: 'Не удалось обработать регистрацию.' },
+      { status: 500, headers },
+    );
   }
 }

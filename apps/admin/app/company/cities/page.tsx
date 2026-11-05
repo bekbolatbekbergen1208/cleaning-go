@@ -1,7 +1,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '../../../lib/supabase/server';
+import { createClient } from '../../../lib/backend/server';
 
 const kazakhstanCities = [
   'Абай','Акколь','Аксай','Аксу','Актау','Актобе','Алга','Алматы','Алтай','Арал','Аркалык','Арыс','Астана','Атбасар','Атырау','Аягоз',
@@ -13,10 +13,10 @@ const kazakhstanCities = [
 ];
 
 export default async function CompanyCitiesPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const backend = await createClient();
+  const { data: { user } } = await backend.auth.getUser();
   if (!user) redirect('/login');
-  const { data: company } = await supabase.from('company_profiles').select('id,name,service_cities').eq('owner_id', user.id).maybeSingle();
+  const { data: company } = await backend.from('company_profiles').select('id,name,service_cities').eq('owner_id', user.id).maybeSingle();
   if (!company) redirect('/');
 
   async function saveCities(formData: FormData) {

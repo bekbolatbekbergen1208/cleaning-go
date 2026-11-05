@@ -1,5 +1,5 @@
 import { Button, Card, EmptyState, Field, Screen, Title, s } from '@/components/ui';
-import { supabase } from '@/lib/supabase';
+import { backend } from '@/lib/backend';
 import { useSessionStore } from '@/store/session';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -27,13 +27,13 @@ export default function SelectCompany() {
 
   useEffect(() => {
     if (!profileId) return;
-    void supabase.from('client_profiles').select('company_locked').eq('user_id', profileId).single().then(({ data }) => {
+    void backend.from('client_profiles').select('company_locked').eq('user_id', profileId).single().then(({ data }) => {
       if (data?.company_locked) {
         Alert.alert('Компания уже закреплена', 'Вы зарегистрировались по специальному коду и не можете выбирать другие компании.');
         router.replace('/(tabs)');
         return;
       }
-      void supabase
+      void backend
       .from('company_profiles')
       .select('id,name,description,service_cities,rating,reviews_count,cashback_bps,welcome_bonus_minor')
       .eq('verification_status', 'approved')
@@ -49,7 +49,7 @@ export default function SelectCompany() {
   async function confirm() {
     if (!selected) return Alert.alert('Выберите компанию', 'Нажмите на карточку подходящей компании.');
     setBusy(true);
-    const { error } = await supabase.rpc('choose_company', { target_company_id: selected });
+    const { error } = await backend.rpc('choose_company', { target_company_id: selected });
     setBusy(false);
     if (error) return Alert.alert('Не удалось выбрать компанию', error.message);
     Alert.alert('Компания выбрана', 'Все ваши заказы будут направляться этой компании.');
@@ -60,7 +60,7 @@ export default function SelectCompany() {
     const code = promoCode.trim().toUpperCase();
     if (!code) return Alert.alert('Введите промокод');
     setBusy(true);
-    const { data, error } = await supabase.rpc('apply_company_promo_code', { input_code: code });
+    const { data, error } = await backend.rpc('apply_company_promo_code', { input_code: code });
     setBusy(false);
     if (error) return Alert.alert('Промокод не принят', error.message);
     const company = data as Company;

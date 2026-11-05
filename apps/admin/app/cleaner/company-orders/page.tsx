@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
-import { createClient } from '../../../lib/supabase/server';
+import { createClient as createAdminClient } from '@cleaning-go/local-client';
+import { createClient } from '../../../lib/backend/server';
 import { advanceCompanyOrder, claimCompanyOrder } from './actions';
 import { CompletionForm } from './completion-form';
 
@@ -23,10 +23,10 @@ function contactPhone(phone?: string) {
 }
 
 export default async function CleanerCompanyOrders() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const backend = await createClient();
+  const { data: { user } } = await backend.auth.getUser();
   if (!user) redirect('/login');
-  const admin = createAdminClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  const admin = createAdminClient((process.env.LOCAL_API_URL || 'http://127.0.0.1:54321'), process.env.LOCAL_SERVICE_KEY!, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const [{ data: cleaner }, { data: ownWork }, { data: communityMember }] = await Promise.all([

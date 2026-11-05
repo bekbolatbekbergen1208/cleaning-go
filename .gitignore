@@ -10,3 +10,12 @@ coverage
 .DS_Store
 supabase/.temp
 supabase/.branches
+
+.local-data/
+.env.*
+!.env.example
+
+/apps/mobile/android/
+/apps/mobile/ios/
+
+/apps/mobile/dist-android/

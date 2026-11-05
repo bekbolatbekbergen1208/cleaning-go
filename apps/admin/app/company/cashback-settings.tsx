@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '../../lib/supabase/client';
+import { createClient } from '../../lib/backend/client';
 
 export function CashbackSettings({ initialBps }: { initialBps: number }) {
   const [bps, setBps] = useState(initialBps);

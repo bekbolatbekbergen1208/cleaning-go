@@ -1,5 +1,5 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { createClient } from './supabase/server';
+import { createClient as createBackendClient } from '@cleaning-go/local-client';
+import { createClient } from './backend/server';
 
 export const trackingStatuses = ['accepted', 'on_the_way', 'arrived', 'in_progress'];
 export { inAstana } from './map-coordinates';
@@ -8,7 +8,7 @@ export async function trackingAccess(id: string) {
   const session = await createClient();
   const { data: { user } } = await session.auth.getUser();
   if (!user) return null;
-  const db = createSupabaseClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
+  const db = createBackendClient((process.env.LOCAL_API_URL || 'http://127.0.0.1:54321'), process.env.LOCAL_SERVICE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
   const [{ data: profile }, { data: order }, { data: worker }, { data: assignment }] = await Promise.all([
     db.from('profiles').select('role,status').eq('id', user.id).maybeSingle(),
     db.from('orders').select('id,order_number,status,client_id,selected_company_id,address_id,address_text,city').eq('id', id).maybeSingle(),

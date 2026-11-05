@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Icon } from '../components/icon';
 import { HomeMotion } from './home-motion';
 import { redirect } from 'next/navigation';
-import { createClient } from '../lib/supabase/server';
+import { createClient } from '../lib/backend/server';
 
 const services = [
   {
@@ -50,19 +50,14 @@ const advantages = [
 ];
 
 export default async function PublicHome() {
-  // Keep the public page available when previewing without backend credentials.
-  if (
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-  ) {
-    const supabase = await createClient();
+  {
+    const backend = await createClient();
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await backend.auth.getUser();
 
     if (user) {
-      const { data: profile } = await supabase
+      const { data: profile } = await backend
         .from('profiles')
         .select('role')
         .eq('id', user.id)

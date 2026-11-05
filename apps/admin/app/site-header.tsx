@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Icon } from '../components/icon';
-import { createClient } from '../lib/supabase/client';
+import { createClient } from '../lib/backend/client';
 
 const adminLinks = [
   ['/admin', 'Обзор'],

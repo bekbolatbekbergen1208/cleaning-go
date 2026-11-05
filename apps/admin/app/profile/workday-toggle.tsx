@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { createClient } from '../../lib/supabase/client';
+import { createClient } from '../../lib/backend/client';
 
 export function WorkdayToggle({ active, endsAt }: { active: boolean; endsAt: string | null }) {
   const router = useRouter();

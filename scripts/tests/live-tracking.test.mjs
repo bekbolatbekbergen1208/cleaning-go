@@ -28,7 +28,7 @@ test('GPS: separate cleaners, assignment checks, read boundaries and terminal cl
       insert into orders values('${id(10)}','accepted','${id(3)}','${id(4)}');
       insert into order_workers values('${id(10)}','${id(1)}'),('${id(10)}','${id(2)}'),('${id(10)}','${id(6)}');
     `);
-    const migration = readFileSync('supabase/migrations/202610080029_multi_cleaner_live_tracking.sql', 'utf8');
+    const migration = readFileSync('local/migrations/202610080029_multi_cleaner_live_tracking.sql', 'utf8');
     await db.exec(migration);
     await db.exec(migration); // Safe if SQL Editor runs it again.
     async function gps(user, lat = 51.128, lng = 71.43) {

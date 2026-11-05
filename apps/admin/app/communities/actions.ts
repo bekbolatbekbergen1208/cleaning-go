@@ -1,14 +1,14 @@
 'use server';
 import { randomBytes } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@cleaning-go/local-client';
 import { requireAdmin } from '../../lib/require-admin';
 
 async function getAdminClient() {
   const session = await requireAdmin();
   const { data: { user } } = await session.auth.getUser();
   if (!user) throw new Error('Администратор не найден');
-  const db = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  const db = createClient((process.env.LOCAL_API_URL || 'http://127.0.0.1:54321'), process.env.LOCAL_SERVICE_KEY!, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   return { db, user };

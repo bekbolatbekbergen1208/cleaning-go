@@ -1,6 +1,6 @@
 import type { Profile } from '@cleaning-go/types';
 import type { Order, OrderStatus } from '@cleaning-go/types';
-import type { Session } from '@supabase/supabase-js';
+import type { Session } from '@cleaning-go/local-client';
 import { create } from 'zustand';
 
 interface SessionState { session: Session | null; profile: Profile | null; loading: boolean; demoOrders: Order[]; setSession: (session: Session | null) => void; setProfile: (profile: Profile | null) => void; setLoading: (value: boolean) => void; addDemoOrder:(order:Order)=>void;updateDemoOrderStatus:(id:string,status:OrderStatus)=>void; }

@@ -1,6 +1,6 @@
-import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { createClient as createAdminClient } from '@cleaning-go/local-client';
 import { redirect } from 'next/navigation';
-import { createClient } from '../../../lib/supabase/server';
+import { createClient } from '../../../lib/backend/server';
 
 type ClientRow = {
   user_id: string;
@@ -9,16 +9,16 @@ type ClientRow = {
 };
 
 export default async function CompanySales() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const backend = await createClient();
+  const { data: { user } } = await backend.auth.getUser();
   if (!user) redirect('/login');
   const [{ data: profile }, { data: company }] = await Promise.all([
-    supabase.from('profiles').select('role').eq('id', user.id).single(),
-    supabase.from('company_profiles').select('id,name,company_code').eq('owner_id', user.id).single(),
+    backend.from('profiles').select('role').eq('id', user.id).single(),
+    backend.from('company_profiles').select('id,name,company_code').eq('owner_id', user.id).single(),
   ]);
   if (profile?.role !== 'company_owner' || !company) redirect('/');
 
-  const admin = createAdminClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  const admin = createAdminClient((process.env.LOCAL_API_URL || 'http://127.0.0.1:54321'), process.env.LOCAL_SERVICE_KEY!, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { data, error } = await admin

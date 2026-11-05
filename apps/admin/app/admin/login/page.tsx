@@ -1,6 +1,6 @@
 'use client';
 
-import { createClient } from '../../../lib/supabase/client';
+import { createClient } from '../../../lib/backend/client';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -15,13 +15,13 @@ export default function AdminLogin() {
     event.preventDefault();
     setError('');
     setLoading(true);
-    const supabase = createClient();
-    const { data, error: loginError } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+    const backend = createClient();
+    const { data, error: loginError } = await backend.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
     if (loginError || !data.user) { setError('Неверный email или пароль'); setLoading(false); return; }
 
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single();
+    const { data: profile } = await backend.from('profiles').select('role').eq('id', data.user.id).single();
     if (profile?.role !== 'admin') {
-      await supabase.auth.signOut();
+      await backend.auth.signOut();
       setError('У этого аккаунта нет доступа администратора.');
       setLoading(false);
       return;

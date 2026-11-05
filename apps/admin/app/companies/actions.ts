@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@cleaning-go/local-client';
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '../../lib/require-admin';
 
@@ -13,7 +13,7 @@ export async function setCompanyFreeAccess(formData: FormData) {
   const free = formData.get('free') === 'true';
   if (!companyId) throw new Error('Компания не найдена');
 
-  const admin = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  const admin = createClient((process.env.LOCAL_API_URL || 'http://127.0.0.1:54321'), process.env.LOCAL_SERVICE_KEY!, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const tariffStatus = free ? 'free' : 'active';

@@ -3,19 +3,21 @@
   "private": true,
   "packageManager": "pnpm@10.14.0",
   "scripts": {
-    "dev:mobile": "pnpm --filter @cleaning-go/mobile start",
-    "dev:admin": "pnpm --filter @cleaning-go/admin dev",
-    "admin:create": "node scripts/create-admin.mjs",
-    "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r --if-present test",
-    "lint": "pnpm -r --if-present lint",
+    "dev:mobile": "corepack pnpm --filter @cleaning-go/mobile start",
+    "dev:admin": "corepack pnpm --filter @cleaning-go/admin dev",
+    "admin:create": "node --env-file=.env.local local/create-admin.mjs",
+    "typecheck": "corepack pnpm -r typecheck",
+    "test": "node --test local/tests/*.test.mjs scripts/tests/*.test.mjs && corepack pnpm --filter @cleaning-go/validation test",
+    "lint": "corepack pnpm -r --if-present lint",
     "format": "prettier --write .",
-    "test:tracking": "node --test scripts/tests/*.test.mjs"
+    "test:tracking": "node --test scripts/tests/*.test.mjs",
+    "local:setup": "node local/setup.mjs",
+    "dev:api": "node --env-file=.env.local local/server.mjs",
+    "test:local": "node --test local/tests/*.test.mjs",
+    "mobile:prepare": "node --env-file=.env.local local/mobile.mjs --prepare",
+    "mobile:local": "node --env-file=.env.local local/mobile.mjs"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.3.14",
-    "@supabase/supabase-js": "^2.53.0",
-    "postgres": "^3.4.7",
     "prettier": "^3.6.2",
     "typescript": "^5.8.3"
   },
@@ -24,5 +26,8 @@
       "@types/react": "19.0.10",
       "@types/react-dom": "19.0.4"
     }
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "0.3.14"
   }
 }

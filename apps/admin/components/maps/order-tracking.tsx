@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createClient } from '../../lib/supabase/client';
+import { createClient } from '../../lib/backend/client';
 import { AstanaMap, type MapPoint, type MapMarker } from './astana-map';
 import { AddressPicker } from './address-picker';
 
@@ -45,15 +45,15 @@ export function OrderTracking({ orderId }: { orderId: string }) {
       finally { loading = false; }
     }
     void refresh();
-    const supabase = createClient();
-    const channel = supabase.channel(`tracking-${orderId}`)
+    const backend = createClient();
+    const channel = backend.channel(`tracking-${orderId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cleaner_locations', filter: `order_id=eq.${orderId}` }, () => void refresh())
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` }, () => void refresh())
       .subscribe();
     const poll = setInterval(() => { setNow(Date.now()); void refresh(); }, 10_000);
     const visible = () => { if (document.visibilityState === 'visible') void refresh(); };
     document.addEventListener('visibilitychange', visible);
-    return () => { disposed = true; controller.abort(); clearInterval(poll); document.removeEventListener('visibilitychange', visible); void supabase.removeChannel(channel); };
+    return () => { disposed = true; controller.abort(); clearInterval(poll); document.removeEventListener('visibilitychange', visible); void backend.removeChannel(channel); };
   }, [orderId]);
 
   const stopSharing = useCallback(() => {

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
-import { createClient } from '../../../lib/supabase/server';
+import { createClient as createAdminClient } from '@cleaning-go/local-client';
+import { createClient } from '../../../lib/backend/server';
 import { acceptDirectOrder, advanceDirectOrder } from './actions';
 import { LiveOrderUpdates } from '../../../components/live-order-updates';
 
@@ -12,7 +12,7 @@ export default async function DirectOrdersPage() {
   const session = await createClient();
   const { data: { user } } = await session.auth.getUser();
   if (!user) redirect('/login');
-  const db = createAdminClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
+  const db = createAdminClient((process.env.LOCAL_API_URL || 'http://127.0.0.1:54321'), process.env.LOCAL_SERVICE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
   const [{ data: profile }, { data: cleaner }, { data: orders, error }] = await Promise.all([
     db.from('profiles').select('role,status').eq('id', user.id).single(),
     db.from('cleaner_profiles').select('verification_status,is_available,workday_ends_at').eq('user_id', user.id).maybeSingle(),

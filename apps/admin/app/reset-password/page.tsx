@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { createClient } from '../../lib/supabase/client';
+import { createClient } from '../../lib/backend/client';
 import { PasswordInput } from '../../components/password-input';
 
 export default function ResetPasswordPage() {
@@ -13,16 +13,16 @@ export default function ResetPasswordPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   useEffect(() => {
-    const supabase = createClient();
+    const backend = createClient();
     void (async () => {
       const params = new URLSearchParams(window.location.search);
       const hash = new URLSearchParams(window.location.hash.slice(1));
       const code = params.get('code');
       const tokenHash = params.get('token_hash');
-      if (code) await supabase.auth.exchangeCodeForSession(code);
-      else if (tokenHash) await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
-      else if (hash.get('access_token') && hash.get('refresh_token')) await supabase.auth.setSession({ access_token: hash.get('access_token')!, refresh_token: hash.get('refresh_token')! });
-      const { data: { user } } = await supabase.auth.getUser();
+      if (code) await backend.auth.exchangeCodeForSession(code);
+      else if (tokenHash) await backend.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
+      else if (hash.get('access_token') && hash.get('refresh_token')) await backend.auth.setSession({ access_token: hash.get('access_token')!, refresh_token: hash.get('refresh_token')! });
+      const { data: { user } } = await backend.auth.getUser();
       setReady(Boolean(user));
       if (!user) setError('Ссылка недействительна или срок её действия истёк. Запросите новую ссылку.');
       window.history.replaceState(null, '', '/reset-password');

@@ -1,4 +1,4 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@cleaning-go/local-client';
 import { NextResponse, type NextRequest } from 'next/server';
 import { bodyIsTooLarge, clientIp, hasJsonContentType, isRateLimited, isSameOriginRequest, readJsonBody } from '../../../../lib/request-security';
 
@@ -26,19 +26,16 @@ export async function POST(request: NextRequest) {
   const staleAuthCookieNames = request.cookies
     .getAll()
     .map(({ name }) => name)
-    .filter((name) => name.startsWith('sb-') && name.includes('-auth-token'));
+    .filter((name) => name === 'cleaning-go-session' || (name.startsWith('sb-') && name.includes('-auth-token')));
   const applyAuthCookies = (response: NextResponse) => {
-    // A previous, larger session can leave an extra chunk such as `.2` in the
-    // browser. Supabase then joins the new `.0`/`.1` cookies with that stale
-    // chunk and rejects the otherwise valid session. Remove every old chunk
-    // first; the fresh cookies below replace the chunks used by the new token.
+    // Remove cookies left by previous sessions before applying the new token.
     staleAuthCookieNames.forEach((name) => response.cookies.set(name, '', { path: '/', maxAge: 0 }));
     cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
     return response;
   };
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)!,
+  const backend = createServerClient(
+    (process.env.NEXT_PUBLIC_LOCAL_API_URL || 'http://127.0.0.1:54321'),
+    '',
     {
       cookies: {
         getAll: () => request.cookies.getAll(),
@@ -49,21 +46,21 @@ export async function POST(request: NextRequest) {
 
   // Clear an expired session before creating the new one. This also removes
   // stale chunked refresh-token cookies left by a previous account.
-  await supabase.auth.signOut({ scope: 'local' });
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  await backend.auth.signOut({ scope: 'local' });
+  const { data, error } = await backend.auth.signInWithPassword({ email, password });
 
   if (error || !data.user) {
     return applyAuthCookies(NextResponse.json({ error: 'Неверный email или пароль' }, { status: 401 }));
   }
 
-  const { data: profile } = await supabase
+  const { data: profile } = await backend
     .from('profiles')
     .select('role')
     .eq('id', data.user.id)
     .maybeSingle();
 
   if (!profile?.role) {
-    await supabase.auth.signOut({ scope: 'local' });
+    await backend.auth.signOut({ scope: 'local' });
     return applyAuthCookies(NextResponse.json(
       { error: 'Профиль аккаунта не найден. Обратитесь в поддержку.' },
       { status: 403 },
@@ -75,5 +72,10 @@ export async function POST(request: NextRequest) {
     : profile.role === 'company_owner'
       ? '/company'
       : '/profile';
+  if (profile.role === 'client') {
+    const { data: client, error: clientError } = await backend.from('client_profiles').select('preferred_company_id').eq('user_id', data.user.id).maybeSingle();
+    if (clientError) return applyAuthCookies(NextResponse.json({ error: 'Не удалось загрузить компанию. Попробуйте ещё раз.' }, { status: 503 }));
+    if (!client?.preferred_company_id) return applyAuthCookies(NextResponse.json({ destination: '/profile/company' }));
+  }
   return applyAuthCookies(NextResponse.json({ destination }));
 }

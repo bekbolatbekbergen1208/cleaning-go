@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@cleaning-go/local-client';
 import { requireAdmin } from '../../lib/require-admin';
 import { createCommunity, deleteCommunity, toggleCommunity } from './actions';
 import { DeleteCommunityButton } from './delete-community-button';
@@ -6,7 +6,7 @@ import { ShareCommunityButton } from './share-community-button';
 
 export default async function CommunitiesPage() {
   await requireAdmin();
-  const admin = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  const admin = createClient((process.env.LOCAL_API_URL || 'http://127.0.0.1:54321'), process.env.LOCAL_SERVICE_KEY!, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { data, error } = await admin

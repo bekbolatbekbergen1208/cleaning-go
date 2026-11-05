@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
-import { createClient } from '../../../lib/supabase/server';
+import { createClient as createAdminClient } from '@cleaning-go/local-client';
+import { createClient } from '../../../lib/backend/server';
 
 const statusLabels: Record<string, string> = {
   accepted: 'Принят', on_the_way: 'В пути', arrived: 'На месте', in_progress: 'Уборка идёт',
@@ -9,10 +9,10 @@ const statusLabels: Record<string, string> = {
 };
 
 export default async function CleanerMyWorkPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const backend = await createClient();
+  const { data: { user } } = await backend.auth.getUser();
   if (!user) redirect('/login');
-  const admin = createAdminClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin = createAdminClient((process.env.LOCAL_API_URL || 'http://127.0.0.1:54321'), process.env.LOCAL_SERVICE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: profile } = await admin.from('profiles').select('role,status').eq('id', user.id).maybeSingle();
   if (!profile || !['cleaner', 'company_cleaner'].includes(profile.role) || profile.status !== 'active') redirect('/profile');
   const [{ data: assignments, error: workerError }, { data: directAssignments, error: directError }] = await Promise.all([

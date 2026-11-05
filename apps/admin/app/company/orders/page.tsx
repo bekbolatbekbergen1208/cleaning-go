@@ -1,8 +1,8 @@
-import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { createClient as createAdminClient } from '@cleaning-go/local-client';
 /* eslint-disable @next/next/no-img-element -- private signed URLs are short-lived and cannot use the shared image optimizer */
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createClient } from '../../../lib/supabase/server';
+import { createClient } from '../../../lib/backend/server';
 import { proposeCompanyPrice, updatePublishedOrder } from './actions';
 import { LiveOrderUpdates } from '../../../components/live-order-updates';
 
@@ -28,11 +28,11 @@ function contactPhone(phone?: string) {
 }
 
 export default async function CompanyOrders() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const backend = await createClient();
+  const { data: { user } } = await backend.auth.getUser();
   if (!user) redirect('/login');
 
-  const admin = createAdminClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  const admin = createAdminClient((process.env.LOCAL_API_URL || 'http://127.0.0.1:54321'), process.env.LOCAL_SERVICE_KEY!, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const [{ data: profile }, { data: company }] = await Promise.all([

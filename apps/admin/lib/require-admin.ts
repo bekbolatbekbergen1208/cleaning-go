@@ -1,19 +1,19 @@
 import { redirect } from 'next/navigation';
-import { createClient } from './supabase/server';
+import { createClient } from './backend/server';
 
 export async function requireAdmin() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const backend = await createClient();
+  const { data: { user } } = await backend.auth.getUser();
 
   if (!user) redirect('/admin/login');
 
   const ownerEmail = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
-  const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+  const { data } = await backend.from('profiles').select('role').eq('id', user.id).single();
 
   if (!ownerEmail || user.email?.toLowerCase() !== ownerEmail || data?.role !== 'admin') {
-    await supabase.auth.signOut();
+    await backend.auth.signOut();
     redirect('/?error=forbidden');
   }
 
-  return supabase;
+  return backend;
 }

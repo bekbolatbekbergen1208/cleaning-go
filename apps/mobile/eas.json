@@ -1,0 +1,27 @@
+{
+  "cli": {
+    "version": ">=16.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "APP_VARIANT": "preview",
+        "EXPO_PUBLIC_LOCAL_API_URL": "http://192.168.68.111:54321",
+        "EXPO_PUBLIC_REGISTRATION_API_URL": "http://192.168.68.111:3000/api/register"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "APP_VARIANT": "production"
+      }
+    }
+  }
+}

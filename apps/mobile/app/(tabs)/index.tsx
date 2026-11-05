@@ -1,6 +1,6 @@
 import { Button, Card, EmptyState, Screen, Title, formatMoney, s } from '@/components/ui';
 import { demoServices } from '@/lib/demo';
-import { supabase } from '@/lib/supabase';
+import { backend } from '@/lib/backend';
 import { useSessionStore } from '@/store/session';
 import type { CleaningService } from '@cleaning-go/types';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -46,12 +46,12 @@ export default function Home() {
       return;
     }
 
-    void supabase.from('cleaning_services').select('*').eq('is_active', true).order('sort_order').then(({ data }) => setServices((data ?? []) as CleaningService[]));
-    void supabase.from('orders').select('id,status').then(({ data }) => setStats({ total: data?.length ?? 0, active: data?.filter((order) => !['completed', 'cancelled'].includes(order.status)).length ?? 0 }));
+    void backend.from('cleaning_services').select('*').eq('is_active', true).order('sort_order').then(({ data }) => setServices((data ?? []) as CleaningService[]));
+    void backend.from('orders').select('id,status').then(({ data }) => setStats({ total: data?.length ?? 0, active: data?.filter((order) => !['completed', 'cancelled'].includes(order.status)).length ?? 0 }));
 
     if (profile?.role === 'company_owner') {
-      void supabase.from('company_profiles').select('company_code,welcome_bonus_minor').eq('owner_id', profile.id).single().then(({ data }) => {if(data?.company_code)setCompanyCode(data.company_code);setWelcomeBonusMinor(Number(data?.welcome_bonus_minor??200000));});
-      void supabase.rpc('get_my_company_report').then(({ data }) => {
+      void backend.from('company_profiles').select('company_code,welcome_bonus_minor').eq('owner_id', profile.id).single().then(({ data }) => {if(data?.company_code)setCompanyCode(data.company_code);setWelcomeBonusMinor(Number(data?.welcome_bonus_minor??200000));});
+      void backend.rpc('get_my_company_report').then(({ data }) => {
         if (!data) return;
         const nextReport = data as CompanyReport;
         setReport(nextReport);
@@ -59,7 +59,7 @@ export default function Home() {
       });
     }
     if (profile?.role === 'client') {
-      void supabase
+      void backend
         .from('client_profiles')
         .select('preferred_company_id,company_locked,company_profiles!preferred_company_id(id,name,rating,reviews_count,cashback_bps)')
         .eq('user_id', profile.id)
@@ -79,14 +79,14 @@ export default function Home() {
   if (!profile) return null;
 
   async function updateCashback(bps: number) {
-    const { error } = await supabase.rpc('set_my_company_cashback', { target_bps: bps });
+    const { error } = await backend.rpc('set_my_company_cashback', { target_bps: bps });
     if (error) return Alert.alert('Не удалось изменить кешбэк', error.message);
     setReport((current) => ({ ...current, cashback_bps: bps }));
     Alert.alert('Кешбэк сохранён', `Клиенты по вашему коду будут получать ${bps / 100}% после завершённого заказа.`);
   }
 
   async function updateWelcomeBonus(minor: number) {
-    const { error } = await supabase.rpc('set_my_company_welcome_bonus', { target_minor: minor });
+    const { error } = await backend.rpc('set_my_company_welcome_bonus', { target_minor: minor });
     if (error) return Alert.alert('Не удалось изменить бонус', error.message);
     setWelcomeBonusMinor(minor);
     Alert.alert('Бонус сохранён', `Новые клиенты получат ${minor / 100} ₸ для заказов только у вашей компании.`);

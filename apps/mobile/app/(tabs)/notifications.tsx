@@ -1,5 +1,5 @@
 import { Card, EmptyState, Screen, Title, s } from '@/components/ui';
-import { supabase } from '@/lib/supabase';
+import { backend } from '@/lib/backend';
 import { useSessionStore } from '@/store/session';
 import { useEffect, useState } from 'react';
 import { Text } from 'react-native';
@@ -11,9 +11,9 @@ export default function Notifications() {
   const [items, setItems] = useState<NotificationItem[]>([]);
 
   useEffect(() => {
-    void supabase.from('notifications').select('id,title,body,created_at').order('created_at', { ascending: false }).then(({ data }) => setItems(data ?? []));
-    const channel = supabase.channel('my-notifications').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => setItems((current) => [payload.new as NotificationItem, ...current])).subscribe();
-    return () => { void supabase.removeChannel(channel); };
+    void backend.from('notifications').select('id,title,body,created_at').order('created_at', { ascending: false }).then(({ data }) => setItems(data ?? []));
+    const channel = backend.channel('my-notifications').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => setItems((current) => [payload.new as NotificationItem, ...current])).subscribe();
+    return () => { void backend.removeChannel(channel); };
   }, [profile?.id, profile?.role]);
 
   return (

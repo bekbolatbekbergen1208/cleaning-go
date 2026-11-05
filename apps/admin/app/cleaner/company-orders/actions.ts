@@ -2,17 +2,17 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
-import { createClient } from '../../../lib/supabase/server';
+import { createClient as createAdminClient } from '@cleaning-go/local-client';
+import { createClient } from '../../../lib/backend/server';
 
 export async function claimCompanyOrder(formData: FormData) {
   const orderId = String(formData.get('order_id') ?? '');
   if (!orderId) throw new Error('Заказ не указан');
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const backend = await createClient();
+  const { data: { user } } = await backend.auth.getUser();
   if (!user) throw new Error('Сначала войдите в аккаунт');
 
-  const { data: order, error } = await supabase.rpc('claim_company_order', { target_order_id: orderId });
+  const { data: order, error } = await backend.rpc('claim_company_order', { target_order_id: orderId });
   if (error) throw new Error(error.message);
   revalidatePath('/cleaner/company-orders');
   revalidatePath('/company/orders');
@@ -28,10 +28,10 @@ const nextStatuses: Record<string, string> = {
 
 export async function advanceCompanyOrder(formData: FormData) {
   const orderId = String(formData.get('order_id') ?? '');
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const backend = await createClient();
+  const { data: { user } } = await backend.auth.getUser();
   if (!user || !orderId) throw new Error('Заказ не найден');
-  const admin = createAdminClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin = createAdminClient((process.env.LOCAL_API_URL || 'http://127.0.0.1:54321'), process.env.LOCAL_SERVICE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: worker } = await admin.from('order_workers').select('order_id').eq('order_id', orderId).eq('cleaner_id', user.id).maybeSingle();
   if (!worker) throw new Error('Сначала возьмите этот заказ');
   const { data: order } = await admin.from('orders').select('id,status,client_id,selected_company_id,photo_urls').eq('id', orderId).maybeSingle();

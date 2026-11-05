@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '../../../lib/supabase/client';
+import { createClient } from '../../../lib/backend/client';
 import { advanceCompanyOrder } from './actions';
 
 export function CompletionForm({ orderId }: { orderId: string }) {
@@ -18,15 +18,15 @@ export function CompletionForm({ orderId }: { orderId: string }) {
     const files = Array.from(input.files ?? []);
     if (!files.length) { setError('Добавьте хотя бы одну фотографию.'); setBusy(false); return; }
     if (files.length > 5) { setError('Можно загрузить не более 5 фотографий.'); setBusy(false); return; }
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const backend = createClient();
+    const { data: { user } } = await backend.auth.getUser();
     if (!user) { router.replace('/login'); return; }
     const paths: string[] = [];
     for (const [index, file] of files.entries()) {
       if (!file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) { setError('Фото должно быть JPEG, PNG или WebP до 10 МБ.'); setBusy(false); return; }
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
       const path = `${user.id}/completion-${orderId}-${Date.now()}-${index}-${safeName}`;
-      const { error: uploadError } = await supabase.storage.from('order-photos').upload(path, file, { contentType: file.type, upsert: false });
+      const { error: uploadError } = await backend.storage.from('order-photos').upload(path, file, { contentType: file.type, upsert: false });
       if (uploadError) { setError(`Не удалось загрузить фото: ${uploadError.message}`); setBusy(false); return; }
       paths.push(path);
     }

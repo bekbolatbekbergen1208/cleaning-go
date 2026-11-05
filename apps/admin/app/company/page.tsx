@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
-import { createClient } from '../../lib/supabase/server';
+import { createClient as createAdminClient } from '@cleaning-go/local-client';
+import { createClient } from '../../lib/backend/server';
 import { joinCommunity, saveReferralSettings } from './actions';
 import { CopyCode } from './copy-code';
 import { CashbackSettings } from './cashback-settings';
@@ -9,11 +9,11 @@ import { LiveOrderUpdates } from '../../components/live-order-updates';
 
 export default async function CompanyHome({ searchParams }: { searchParams: Promise<{ referral_saved?: string; referral_error?: string }> }) {
   const params = await searchParams;
-  const supabase=await createClient(); const {data:{user}}=await supabase.auth.getUser(); if(!user) redirect('/login');
+  const backend=await createClient(); const {data:{user}}=await backend.auth.getUser(); if(!user) redirect('/login');
   // Authorization is based on the verified auth user id. Load the matching
   // role and company server-side so an RLS/cache hiccup cannot incorrectly
   // send a valid company owner back to the public home page.
-  const admin=createAdminClient(process.env.SUPABASE_URL!,process.env.SUPABASE_SERVICE_ROLE_KEY!,{auth:{persistSession:false,autoRefreshToken:false}});
+  const admin=createAdminClient((process.env.LOCAL_API_URL || 'http://127.0.0.1:54321'),process.env.LOCAL_SERVICE_KEY!,{auth:{persistSession:false,autoRefreshToken:false}});
   // Do not include optional bonus columns in the authorization query. Older
   // production schemas may not have them yet, and PostgREST would reject the
   // entire company row and incorrectly send a valid owner back to login.
@@ -26,11 +26,11 @@ export default async function CompanyHome({ searchParams }: { searchParams: Prom
   const company={...companyRow,welcome_bonus_minor:Number(bonusSettings?.welcome_bonus_minor??0),referral_bonus_minor:Number(bonusSettings?.referral_bonus_minor??0),referral_enabled:Boolean(bonusSettings?.referral_enabled),cashback_bps:Number(bonusSettings?.cashback_bps??500)};
   const community=communityMembership?.cleaner_communities as unknown as {name:string;code:string;is_active:boolean}|null;
   const [{count:clients},{count:referralClients},{count:orders},{data:completedOrders},{data:ledger},{data:notifications}]=await Promise.all([
-    supabase.from('company_code_uses').select('*',{count:'exact',head:true}).eq('company_id',company.id),
-    supabase.from('company_code_uses').select('*',{count:'exact',head:true}).eq('company_id',company.id).eq('code_type','referral'),
+    backend.from('company_code_uses').select('*',{count:'exact',head:true}).eq('company_id',company.id),
+    backend.from('company_code_uses').select('*',{count:'exact',head:true}).eq('company_id',company.id).eq('code_type','referral'),
     admin.from('orders').select('*',{count:'exact',head:true}).eq('selected_company_id',company.id),
     admin.from('orders').select('total_minor,executor_amount_minor').eq('selected_company_id',company.id).eq('status','completed'),
-    supabase.from('company_bonus_ledger').select('operation,amount_minor').eq('company_id',company.id),
+    backend.from('company_bonus_ledger').select('operation,amount_minor').eq('company_id',company.id),
     admin.from('notifications').select('id,title,body,created_at').eq('user_id',user.id).order('created_at',{ascending:false}).limit(10),
   ]);
   const issued=(ledger??[]).filter(x=>['welcome_grant','referral_grant'].includes(x.operation)).reduce((s,x)=>s+Number(x.amount_minor),0);

@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { Icon } from '../../../components/icon';
 import { AddressPicker } from '../../../components/maps/address-picker';
 import type { MapPoint } from '../../../components/maps/astana-map';
-import { createClient } from '../../../lib/supabase/client';
+import { createClient } from '../../../lib/backend/client';
 
 type Service = {
   id: string;
@@ -34,6 +34,7 @@ export function OrderForm({
   services,
   companies,
   cleaners,
+  initialCity,
   preferredCompanyId,
   companyLocked,
   bonusBalances,
@@ -41,6 +42,7 @@ export function OrderForm({
   services: Service[];
   companies: Company[];
   cleaners: Cleaner[];
+  initialCity: string;
   preferredCompanyId: string | null;
   companyLocked: boolean;
   bonusBalances?: Record<string, number>;
@@ -51,7 +53,7 @@ export function OrderForm({
   );
   const cityOptions = [
     ...new Set(
-      ['Актау', ...approvedCompanies.flatMap((company) => company.service_cities), ...cleaners.map((cleaner) => cleaner.work_zone ?? '')]
+      [initialCity, 'Актау', ...approvedCompanies.flatMap((company) => company.service_cities), ...cleaners.map((cleaner) => cleaner.work_zone ?? '')]
         .map((item) => item.trim())
         .filter(Boolean),
     ),
@@ -73,7 +75,7 @@ export function OrderForm({
   }, [photo]);
   const [serviceId, setServiceId] = useState(services[0]?.id ?? '');
   const [city, setCity] = useState(
-    cityOptions.includes('Актау') ? 'Актау' : (cityOptions[0] ?? 'Актау'),
+    initialCity || (cityOptions.includes('Актау') ? 'Актау' : (cityOptions[0] ?? 'Актау')),
   );
   const [companyId, setCompanyId] = useState(
     preferredCompanyId ?? approvedCompanies[0]?.id ?? '',
@@ -135,16 +137,16 @@ export function OrderForm({
         return;
       }
 
-      const supabase = createClient();
+      const backend = createClient();
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await backend.auth.getUser();
       if (!user) {
         router.replace('/login');
         return;
       }
       const photoPath = `${user.id}/${Date.now()}-${selectedPhoto.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-      const { error: photoError } = await supabase.storage
+      const { error: photoError } = await backend.storage
         .from('order-photos')
         .upload(photoPath, selectedPhoto, { contentType: selectedPhoto.type, upsert: false });
       if (photoError) {
@@ -153,7 +155,7 @@ export function OrderForm({
         return;
       }
 
-      const { data: address, error: addressError } = await supabase
+      const { data: address, error: addressError } = await backend
         .from('addresses')
         .insert({
           user_id: user.id,
@@ -187,7 +189,7 @@ export function OrderForm({
       }
       const orderFunction =
         requestedBonusMinor > 0 ? 'create_order_with_bonus' : 'create_order';
-      const { data: order, error: orderError } = await supabase.rpc(
+      const { data: order, error: orderError } = await backend.rpc(
         orderFunction,
         {
           payload: {

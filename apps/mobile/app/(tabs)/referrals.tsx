@@ -1,5 +1,5 @@
 import { Button, Card, Screen, Title, formatMoney, s } from '@/components/ui';
-import { supabase } from '@/lib/supabase';
+import { backend, endpoints } from '@/lib/backend';
 import { useSessionStore } from '@/store/session';
 import { useEffect, useState } from 'react';
 import { Alert, Platform, Share, Text } from 'react-native';
@@ -9,11 +9,11 @@ export default function Referrals() {
   const [balance, setBalance] = useState(0);
   const [copied, setCopied] = useState(false);
   const code = profile?.referral_code ?? '';
-  const link = `https://cleaninggo.kz/r/${code}`;
+  const link = `${endpoints.webUrl}/r/${encodeURIComponent(code)}`;
 
   useEffect(() => {
     if (!profile?.id) return;
-    void supabase.from('wallets').select('available_minor').eq('owner_id', profile.id).single().then(({ data }) => setBalance(data?.available_minor ?? 0));
+    void backend.from('wallets').select('available_minor').eq('owner_id', profile.id).single().then(({ data }) => setBalance(data?.available_minor ?? 0));
   }, [profile?.id]);
 
   async function shareLink() {

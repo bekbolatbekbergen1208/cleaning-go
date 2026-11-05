@@ -1,6 +1,6 @@
 import { Button, Card, Screen, Title, s } from '@/components/ui';
 import { stopOrderTracking } from '@/lib/background-location';
-import { supabase } from '@/lib/supabase';
+import { backend } from '@/lib/backend';
 import { useSessionStore } from '@/store/session';
 import { useEffect, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
@@ -22,13 +22,13 @@ export default function Profile() {
   }, []);
   useEffect(() => {
     if (!isCleaner || !profile?.id) return;
-    void supabase.from('cleaner_profiles').select('is_available,workday_ends_at').eq('user_id', profile.id).single()
+    void backend.from('cleaner_profiles').select('is_available,workday_ends_at').eq('user_id', profile.id).single()
       .then(({ data }) => { setAvailable(Boolean(data?.is_available)); setEndsAt(data?.workday_ends_at ?? null); });
   }, [isCleaner, profile?.id]);
 
   async function toggleShift() {
     setBusy(true);
-    const { data, error } = await supabase.rpc('set_cleaner_workday', { target_active: !active, duration_hours: hours });
+    const { data, error } = await backend.rpc('set_cleaner_workday', { target_active: !active, duration_hours: hours });
     if (error) Alert.alert('Не удалось изменить смену', error.message);
     else {
       if (active) await stopOrderTracking();
@@ -39,7 +39,7 @@ export default function Profile() {
   }
   async function signOut() {
     await stopOrderTracking();
-    const { error } = await supabase.auth.signOut();
+    const { error } = await backend.auth.signOut();
     if (error) Alert.alert('Ошибка', error.message);
   }
   return <Screen><Title>Профиль</Title>

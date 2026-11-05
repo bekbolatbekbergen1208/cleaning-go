@@ -1,4 +1,4 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@cleaning-go/local-client';
 import { NextResponse, type NextRequest } from 'next/server';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
@@ -22,12 +22,12 @@ export async function middleware(request: NextRequest) {
   if (['/api/auth/login', '/api/register'].includes(request.nextUrl.pathname)) return secure(NextResponse.next());
 
   let response = NextResponse.next({ request });
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)!,
+  const backend = createServerClient(
+    (process.env.NEXT_PUBLIC_LOCAL_API_URL || 'http://127.0.0.1:54321'),
+    '',
     { cookies: { getAll: () => request.cookies.getAll(), setAll(items: CookieToSet[]) { items.forEach(({ name, value }) => request.cookies.set(name, value)); response = NextResponse.next({ request }); items.forEach(({ name, value, options }) => response.cookies.set(name, value, options)); } } },
   );
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await backend.auth.getUser();
   if (!user && request.nextUrl.pathname.startsWith('/api/orders/')) {
     const unauthorized = NextResponse.json({ error: 'Сначала войдите в аккаунт' }, { status: 401 });
     response.cookies.getAll().forEach(cookie => unauthorized.cookies.set(cookie));

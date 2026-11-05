@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation';
 /* eslint-disable @next/next/no-img-element -- private signed URLs are short-lived and cannot use the shared image optimizer */
 import Link from 'next/link';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
-import { createClient } from '../../lib/supabase/server';
+import { createClient as createAdminClient } from '@cleaning-go/local-client';
+import { createClient } from '../../lib/backend/server';
 import { CommunityJoinForm } from './community-join-form';
 import { InvitationCard } from './invitation-card';
 import { confirmOrderCompletion } from './actions';
@@ -18,13 +18,13 @@ const roleNames: Record<string, string> = {
 };
 
 export default async function ProfilePage() {
-  const supabase = await createClient();
+  const backend = await createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await backend.auth.getUser();
   if (!user) redirect('/login');
 
-  const { data: profile } = await supabase
+  const { data: profile } = await backend
     .from('profiles')
     .select('full_name,email,phone,role,status')
     .eq('id', user.id)
@@ -42,16 +42,16 @@ export default async function ProfilePage() {
     { data: clientProfile },
     { data: notifications },
   ] = await Promise.all([
-    supabase
+    backend
       .from('wallets')
       .select('available_minor,pending_minor,currency')
       .eq('owner_id', user.id)
       .maybeSingle(),
-    supabase
+    backend
       .from('company_bonus_balances')
       .select('company_id,balance_minor,company_profiles(name)')
       .eq('client_id', user.id),
-    supabase
+    backend
       .from('company_bonus_ledger')
       .select(
         'id,operation,amount_minor,description,created_at,company_profiles(name)',
@@ -59,7 +59,7 @@ export default async function ProfilePage() {
       .eq('client_id', user.id)
       .order('created_at', { ascending: false })
       .limit(10),
-    supabase
+    backend
       .from('orders')
       .select(
         'id,order_number,status,scheduled_at,total_minor,price_confirmed_at,photo_urls,reviews(id)',
@@ -67,23 +67,24 @@ export default async function ProfilePage() {
       .eq('client_id', user.id)
       .order('created_at', { ascending: false })
       .limit(3),
-    supabase
+    backend
       .from('referral_codes')
       .select('code')
       .eq('owner_id', user.id)
       .maybeSingle(),
-    supabase
+    backend
       .from('client_profiles')
       .select('company_locked,preferred_company_id,company_profiles(name)')
       .eq('user_id', user.id)
       .maybeSingle(),
-    supabase
+    backend
       .from('notifications')
       .select('id,title,body,created_at,read_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(10),
   ]);
+  if (profile?.role === 'client' && profile.status === 'active' && !clientProfile?.preferred_company_id) redirect('/profile/company');
   const companyBonusMinor = (bonuses ?? []).reduce(
     (sum, item) => sum + Number(item.balance_minor),
     0,
@@ -91,15 +92,15 @@ export default async function ProfilePage() {
   const money = (minor: number | null | undefined) =>
     `${(Number(minor ?? 0) / 100).toLocaleString('ru-RU')} ₸`;
   const admin = createAdminClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    (process.env.LOCAL_API_URL || 'http://127.0.0.1:54321'),
+    process.env.LOCAL_SERVICE_KEY!,
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
   const isCleaner =
     profile?.role === 'cleaner' || profile?.role === 'company_cleaner';
-  const { data: cleanerAvailability } = isCleaner ? await supabase.from('cleaner_profiles').select('is_available,workday_ends_at').eq('user_id', user.id).maybeSingle() : { data: null };
+  const { data: cleanerAvailability } = isCleaner ? await backend.from('cleaner_profiles').select('is_available,workday_ends_at').eq('user_id', user.id).maybeSingle() : { data: null };
   const { data: membership, error: membershipError } = isCleaner
-    ? await supabase
+    ? await backend
         .from('community_cleaners')
         .select('cleaner_communities(name,is_active)')
         .eq('cleaner_id', user.id)

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { PasswordInput } from '../../components/password-input';
 import { Icon } from '../../components/icon';
-import { createClient } from '../../lib/supabase/client';
+import { createClient } from '../../lib/backend/client';
 
 export default function Login() {
   const [email, setEmail] = useState('');

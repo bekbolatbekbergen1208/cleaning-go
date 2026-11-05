@@ -19,8 +19,8 @@ function accessWith({ role = 'client', status = 'active', userId = 'client', wor
   } };
   const exports = {};
   const dependencies = {
-    '@supabase/supabase-js': { createClient: () => db },
-    './supabase/server': { createClient: async () => ({ auth: { getUser: async () => ({ data: { user: loggedIn ? { id: userId } : null } }) } }) },
+    '@cleaning-go/local-client': { createClient: () => db },
+    './backend/server': { createClient: async () => ({ auth: { getUser: async () => ({ data: { user: loggedIn ? { id: userId } : null } }) } }) },
     './map-coordinates': { inAstana: () => true },
   };
   new Function('require', 'exports', source)(name => dependencies[name], exports);

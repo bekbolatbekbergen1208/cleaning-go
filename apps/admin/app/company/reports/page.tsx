@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
-import { createClient } from '../../../lib/supabase/server';
+import { createClient as createAdminClient } from '@cleaning-go/local-client';
+import { createClient } from '../../../lib/backend/server';
 
 type ReportOrder = { client_id: string; status: string; total_minor: number; executor_amount_minor: number; company_cashback_minor: number; created_at: string };
 
@@ -9,7 +9,7 @@ export default async function CompanyReports({ searchParams }: { searchParams: P
   const session = await createClient();
   const { data: { user } } = await session.auth.getUser();
   if (!user) redirect('/login');
-  const admin = createAdminClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin = createAdminClient((process.env.LOCAL_API_URL || 'http://127.0.0.1:54321'), process.env.LOCAL_SERVICE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
   const [{ data: profile }, { data: company }] = await Promise.all([
     admin.from('profiles').select('role,status').eq('id', user.id).single(),
     admin.from('company_profiles').select('id,name').eq('owner_id', user.id).single(),
