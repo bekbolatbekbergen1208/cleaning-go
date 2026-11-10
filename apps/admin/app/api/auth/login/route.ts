@@ -49,6 +49,12 @@ export async function POST(request: NextRequest) {
   await backend.auth.signOut({ scope: 'local' });
   const { data, error } = await backend.auth.signInWithPassword({ email, password });
 
+  if (error?.status === 429) {
+    return applyAuthCookies(NextResponse.json({ error: 'Слишком много попыток входа. Попробуйте через 15 минут.' }, { status: 429 }));
+  }
+  if (error?.status === 0) {
+    return applyAuthCookies(NextResponse.json({ error: 'Сервер недоступен. Попробуйте позже.' }, { status: 503 }));
+  }
   if (error || !data.user) {
     return applyAuthCookies(NextResponse.json({ error: 'Неверный email или пароль' }, { status: 401 }));
   }

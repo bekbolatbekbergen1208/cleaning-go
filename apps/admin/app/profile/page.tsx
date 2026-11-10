@@ -17,6 +17,20 @@ const roleNames: Record<string, string> = {
   company_cleaner: 'Клинер',
 };
 
+const orderStatusNames: Record<string, string> = {
+  created: 'Создан',
+  searching: 'Ожидает исполнителя',
+  offered: 'Цена предложена',
+  accepted: 'Принят',
+  on_the_way: 'В пути',
+  arrived: 'На месте',
+  in_progress: 'Уборка идёт',
+  completed_by_cleaner: 'Ожидает подтверждения',
+  completed: 'Завершён',
+  cancelled: 'Отменён',
+  disputed: 'Спор',
+};
+
 export default async function ProfilePage() {
   const backend = await createClient();
   const {
@@ -380,7 +394,7 @@ export default async function ProfilePage() {
                     <div className="flex items-center justify-between gap-3">
                       <b>{order.order_number}</b>
                       <span className="text-xs font-semibold text-emerald-700">
-                        {order.status}
+                        {orderStatusNames[order.status] ?? order.status}
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-slate-500">

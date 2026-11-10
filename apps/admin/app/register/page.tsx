@@ -129,7 +129,7 @@ export default function RegisterPage() {
               autoComplete="tel"
               placeholder="+7 700 000 00 00"
               required
-              pattern="[+0-9() -]{10,20}"
+              pattern="[+0-9\(\) \-]{10,20}"
             />
           </label>
           <label className="field-label sm:col-span-2">

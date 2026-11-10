@@ -131,8 +131,30 @@ export function OrderForm({
         setBusy(false);
         return;
       }
-      if (scheduledAt <= new Date()) {
+      if (Number.isNaN(scheduledAt.getTime()) || scheduledAt <= new Date()) {
         setError('Выберите будущее время уборки.');
+        setBusy(false);
+        return;
+      }
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(selectedPhoto.type)) {
+        setError('Фото должно быть в формате JPG, PNG или WebP.');
+        setBusy(false);
+        return;
+      }
+      // Validate everything before uploading the photo and saving the address,
+      // otherwise a rejected order leaves orphaned files and addresses behind.
+      if (executor === 'cleaner' && !selectedCleaner) {
+        setError('Выберите доступного клинера.');
+        setBusy(false);
+        return;
+      }
+      const requestedBonusMinor = executor === 'company' ? Math.round(Number(bonusKzt) * 100) : 0;
+      if (
+        !Number.isFinite(requestedBonusMinor) ||
+        requestedBonusMinor < 0 ||
+        requestedBonusMinor > availableBonusMinor
+      ) {
+        setError('Указанная сумма превышает доступный бонус.');
         setBusy(false);
         return;
       }
@@ -173,20 +195,6 @@ export function OrderForm({
         return;
       }
 
-      if (executor === 'cleaner' && !selectedCleaner) {
-        setError('Выберите доступного клинера.');
-        setBusy(false);
-        return;
-      }
-      const requestedBonusMinor = executor === 'company' ? Math.round(Number(bonusKzt) * 100) : 0;
-      if (
-        requestedBonusMinor < 0 ||
-        requestedBonusMinor > availableBonusMinor
-      ) {
-        setError('Указанная сумма превышает доступный бонус.');
-        setBusy(false);
-        return;
-      }
       const orderFunction =
         requestedBonusMinor > 0 ? 'create_order_with_bonus' : 'create_order';
       const { data: order, error: orderError } = await backend.rpc(
@@ -223,6 +231,7 @@ export function OrderForm({
       formElement.reset();
       setMapPoint(null);
       setPhoto(null);
+      setBonusKzt(0);
     } catch {
       setError(
         'Не удалось отправить заказ. Проверьте соединение и попробуйте снова.',
@@ -472,7 +481,7 @@ export function OrderForm({
         </label>
         <label className="inline-flex cursor-pointer items-center rounded-xl border border-emerald-600 px-4 py-3 text-sm font-bold text-emerald-700">
           {photo ? 'Переснять фотографию' : 'Сделать фотографию камерой'}
-          <input className="sr-only" type="file" accept="image/*" capture="environment" aria-label="Сделать фотографию камерой" onChange={(event) => setPhoto(event.target.files?.[0] ?? null)} />
+          <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" aria-label="Сделать фотографию камерой" onChange={(event) => setPhoto(event.target.files?.[0] ?? null)} />
         </label>
         {photoPreview && (
           <div className="photo-preview">

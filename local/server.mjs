@@ -37,18 +37,31 @@ export async function startServer({
   await mkdir(root, { recursive: true });
   const db = database || (await openDatabase(resolve(root, 'db')));
   const limits = new Map();
-  function rate(key, max = 20) {
+  const tooMany = () =>
+    Object.assign(new Error('Слишком много запросов. Попробуйте позже.'), {
+      status: 429,
+    });
+  function hit(key) {
     const now = Date.now();
+    if (limits.size > 10000)
+      for (const [k, v] of limits) if (v.until < now) limits.delete(k);
     const v = limits.get(key);
     if (!v || v.until < now) {
       limits.set(key, { count: 1, until: now + 900000 });
-      return;
+      return 1;
     }
-    if (++v.count > max)
-      throw Object.assign(
-        new Error('Слишком много запросов. Попробуйте позже.'),
-        { status: 429 },
-      );
+    return ++v.count;
+  }
+  function rate(key, max = 20) {
+    if (hit(key) > max) throw tooMany();
+  }
+  // Web logins all arrive from the Next.js server address, so a per-IP counter
+  // of every attempt would lock out the whole site after a few logins. Count
+  // only failed attempts per address and account; a success clears them.
+  const LOGIN_FAILURES = 10;
+  function loginBlocked(key) {
+    const v = limits.get(key);
+    return !!v && v.until >= Date.now() && v.count >= LOGIN_FAILURES;
   }
   const userShape = (u) => ({
     id: u.id,
@@ -223,10 +236,11 @@ export async function startServer({
         return;
       }
       if (body.action === 'signIn') {
-        rate(`login:${req.socket.remoteAddress}`);
         const email = String(body.email || '')
           .trim()
           .toLowerCase();
+        const loginKey = `login:${req.socket.remoteAddress}:${email}`;
+        if (loginBlocked(loginKey)) throw tooMany();
         const password = String(body.password || '');
         if (password.length > 256) throw new Error('Invalid credentials');
         const u = (
@@ -235,10 +249,13 @@ export async function startServer({
             [email],
           )
         ).rows[0];
-        if (!u || !passwordMatches(password, u.encrypted_password))
+        if (!u || !passwordMatches(password, u.encrypted_password)) {
+          hit(loginKey);
           throw Object.assign(new Error('Неверный email или пароль'), {
             status: 401,
           });
+        }
+        limits.delete(loginKey);
         const s = await session(u);
         send({ data: { user: s.user, session: s }, error: null });
         return;

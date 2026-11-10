@@ -52,7 +52,7 @@ export function CompanyChoice({ companies, preferredCompanyId, locked, initialCi
       <p className="mt-2 text-xs text-emerald-800">Кешбэк {Number(company.cashback_bps) / 100}% · приветственный бонус {(Number(company.welcome_bonus_minor) / 100).toLocaleString('ru-RU')} ₸</p>
       {selected === company.id && <span className="mt-2 inline-block text-xs font-bold text-emerald-700">Выбрано</span>}
     </button>)}</div>
-    {message && <p role="status" className="text-sm font-semibold text-emerald-700">{message}</p>}
+    {message && <p role="alert" className="text-sm font-semibold text-red-600">{message}</p>}
     <div className="flex flex-wrap gap-3"><button type="button" className="button" disabled={busy || locked || !visibleCompanies.some(company => company.id === selected)} onClick={save}>{busy ? 'Сохраняем…' : 'Подтвердить выбор'}</button>{preferredCompanyId && <Link href="/order/new" className="rounded-xl border px-4 py-3 font-bold">Новый заказ</Link>}</div>
   </div>;
 }
