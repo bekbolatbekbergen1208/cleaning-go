@@ -1,12 +1,16 @@
 import './globals.css';
 import 'leaflet/dist/leaflet.css';
-import type { Viewport } from 'next';
+import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { SiteHeader } from './site-header';
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'Cleaning Go',
   description: 'Сервис заказа уборки',
+  // iPhone "Add to Home Screen": full-screen app, readable status bar.
+  appleWebApp: { capable: true, title: 'Cleaning Go', statusBarStyle: 'default' },
+  // Stop iOS/Samsung from turning order numbers and dates into phone links.
+  formatDetection: { telephone: false, email: false, address: false },
 };
 export const viewport: Viewport = {
   width: 'device-width',

@@ -131,7 +131,7 @@ export function InvitationCard({
       <div className="mt-5 rounded-2xl border border-slate-200 p-4">
         <p className="text-xs text-slate-500">Ваш реферальный код</p>
         <div className="referral-copy mt-1 flex items-center justify-between gap-3">
-          <b className="truncate text-xl">{referralCode ?? '—'}</b>
+          <b className="break-words text-xl">{referralCode ?? '—'}</b>
           <button
             className="button"
             type="button"

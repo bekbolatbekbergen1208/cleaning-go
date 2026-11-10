@@ -10,25 +10,12 @@ import { ConfirmPriceForm } from './confirm-price-form';
 import { CancelOrderButton } from './cancel-order-button';
 import { LiveOrderUpdates } from '../../components/live-order-updates';
 import { WorkdayToggle } from './workday-toggle';
+import { bonusOperationNames, humanizeCodes, label, orderStatusNames } from '../../lib/labels';
 
 const roleNames: Record<string, string> = {
   client: 'Клиент',
   cleaner: 'Клинер',
   company_cleaner: 'Клинер',
-};
-
-const orderStatusNames: Record<string, string> = {
-  created: 'Создан',
-  searching: 'Ожидает исполнителя',
-  offered: 'Цена предложена',
-  accepted: 'Принят',
-  on_the_way: 'В пути',
-  arrived: 'На месте',
-  in_progress: 'Уборка идёт',
-  completed_by_cleaner: 'Ожидает подтверждения',
-  completed: 'Завершён',
-  cancelled: 'Отменён',
-  disputed: 'Спор',
 };
 
 export default async function ProfilePage() {
@@ -282,7 +269,7 @@ export default async function ProfilePage() {
           </div>
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-xs text-slate-500">Реферальный код</p>
-            <p className="mt-1 truncate text-lg font-black">
+            <p className="mt-1 break-words text-[15px] font-black leading-tight min-[360px]:text-lg">
               {referral?.code ?? '—'}
             </p>
           </div>
@@ -348,16 +335,16 @@ export default async function ProfilePage() {
                   className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 p-4 text-sm"
                 >
                   <div>
-                    <b>{item.description ?? item.operation}</b>
+                    <b>{item.description || label(bonusOperationNames, item.operation)}</b>
                     <p className="text-xs text-slate-500">
                       {new Date(item.created_at).toLocaleString('ru-RU')}
                     </p>
                   </div>
                   <b
                     className={
-                      item.operation === 'order_use'
+                      `shrink-0 whitespace-nowrap ${item.operation === 'order_use'
                         ? 'text-red-600'
-                        : 'text-emerald-700'
+                        : 'text-emerald-700'}`
                     }
                   >
                     {item.operation === 'order_use' ? '−' : '+'}
@@ -370,7 +357,7 @@ export default async function ProfilePage() {
         )}
         {profile?.role === 'client' && (
           <div className="mt-8">
-            <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-black">Последние заказы</h2><Link href="/profile/orders" className="text-sm font-bold text-emerald-700">Все заказы →</Link></div>
+            <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-black">Последние заказы</h2><Link href="/profile/orders" className="shrink-0 whitespace-nowrap text-sm font-bold text-emerald-700">Все заказы →</Link></div>
             <div className="mt-3 space-y-2">
               {orders?.length ? (
                 orders.map((order) => (
@@ -392,8 +379,8 @@ export default async function ProfilePage() {
                       </Link>
                     )}
                     <div className="flex items-center justify-between gap-3">
-                      <b>{order.order_number}</b>
-                      <span className="text-xs font-semibold text-emerald-700">
+                      <b className="min-w-0 break-words">{order.order_number}</b>
+                      <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
                         {orderStatusNames[order.status] ?? order.status}
                       </span>
                     </div>
@@ -483,7 +470,7 @@ export default async function ProfilePage() {
               {notifications?.map((item) => (
                 <div className="rounded-2xl bg-sky-50 p-4" key={item.id}>
                   <b className="text-sm">{item.title}</b>
-                  <p className="mt-1 text-sm text-slate-600">{item.body}</p>
+                  <p className="mt-1 text-sm text-slate-600">{humanizeCodes(item.body)}</p>
                   <p className="mt-1 text-xs text-slate-400">
                     {new Date(item.created_at).toLocaleString('ru-RU')}
                   </p>

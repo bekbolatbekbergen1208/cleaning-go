@@ -1612,3 +1612,91 @@ input[type='file']::file-selector-button {
     font-size: 26px;
   }
 }
+
+/* ---- Phone adaptation: iPhone (Safari) and Android (Samsung Internet / Chrome) ---- */
+@media (max-width: 767px) {
+  /* Wide data tables become stacked cards instead of a sideways-scrolling table. */
+  .site-main table.responsive-table {
+    min-width: 0;
+  }
+  .responsive-table-wrap {
+    overflow: visible;
+  }
+  .responsive-table thead {
+    display: none;
+  }
+  .responsive-table,
+  .responsive-table tbody,
+  .responsive-table tr {
+    display: block;
+    width: 100%;
+  }
+  .responsive-table tr {
+    padding: 12px 16px;
+  }
+  .responsive-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 6px 0 !important;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+  .responsive-table td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    color: #64748b;
+    font-weight: 600;
+    text-align: left;
+  }
+  /* iOS Safari: empty date inputs collapse and the value is centred. */
+  .site-main input[type='date'],
+  .site-main input[type='time'],
+  .site-main input[type='datetime-local'] {
+    -webkit-appearance: none;
+    display: block;
+    width: 100%;
+    min-height: 52px;
+  }
+  .site-main input::-webkit-date-and-time-value {
+    min-height: 1.5em;
+    text-align: left;
+  }
+  /* Notch / Dynamic Island in landscape. */
+  .site-main {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+  .header-inner {
+    padding-left: max(18px, env(safe-area-inset-left));
+    padding-right: max(18px, env(safe-area-inset-right));
+  }
+}
+@media (max-width: 639px) {
+  /* Odd last tile in a 2-column phone grid spans the full row instead of hanging alone. */
+  .site-main .grid-cols-2 > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+@media (pointer: coarse) {
+  /* Touch targets of at least 44px (Apple HIG) for standalone text links and buttons. */
+  .site-main a.text-sm:not(p a):not(.block):not(.flex):not(.grid):not(.w-full):not(.button),
+  .site-main button.text-sm:not(.block):not(.flex):not(.w-full):not(.button),
+  .auth-card button.text-sm,
+  .auth-card a.font-bold,
+  .home-footer a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  .site-logo {
+    min-height: 44px;
+  }
+  /* leaflet.css loads after this file, so the selector must be more specific. */
+  .map-shell .leaflet-touch .leaflet-bar a {
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+  }
+}

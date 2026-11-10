@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { humanizeCodes } from '../../lib/labels';
 import { createClient } from '../../lib/backend/client';
 
 type Notice = { id: string; title: string; body: string; created_at: string };
@@ -21,5 +22,5 @@ export function NotificationFeed({ userId }: { userId: string }) {
     }).subscribe();
     return () => { active = false; void backend.removeChannel(channel); };
   }, [userId]);
-  return <div className="mt-6 space-y-3">{error && <p role="alert" className="text-red-600">{error}</p>}{items.length ? items.map(item => <article className="card" key={item.id}><h2 className="font-black">{item.title}</h2><p className="mt-1 text-sm">{item.body}</p><p className="mt-2 text-xs text-slate-500">{new Date(item.created_at).toLocaleString('ru-KZ')}</p></article>) : !error && <p className="card">Новых уведомлений пока нет.</p>}</div>;
+  return <div className="mt-6 space-y-3">{error && <p role="alert" className="text-red-600">{error}</p>}{items.length ? items.map(item => <article className="card" key={item.id}><h2 className="font-black">{item.title}</h2><p className="mt-1 text-sm">{humanizeCodes(item.body)}</p><p className="mt-2 text-xs text-slate-500">{new Date(item.created_at).toLocaleString('ru-KZ')}</p></article>) : !error && <p className="card">Новых уведомлений пока нет.</p>}</div>;
 }

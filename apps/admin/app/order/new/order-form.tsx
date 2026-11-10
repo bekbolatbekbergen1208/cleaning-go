@@ -7,6 +7,7 @@ import { Icon } from '../../../components/icon';
 import { AddressPicker } from '../../../components/maps/address-picker';
 import type { MapPoint } from '../../../components/maps/astana-map';
 import { createClient } from '../../../lib/backend/client';
+import { label, verificationNames } from '../../../lib/labels';
 
 type Service = {
   id: string;
@@ -362,7 +363,7 @@ export function OrderForm({
               <b>{unavailableLockedCompany?.name ?? 'Закреплённая компания'}</b>
               <p className="mt-1">
                 {unavailableLockedCompany
-                  ? `Текущий статус: ${unavailableLockedCompany.verification_status}. Администратор должен одобрить компанию.`
+                  ? `Текущий статус: ${label(verificationNames, unavailableLockedCompany.verification_status)}. Администратор должен одобрить компанию.`
                   : 'Данные компании недоступны. Обратитесь к администратору.'}
               </p>
             </div>

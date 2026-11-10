@@ -35,7 +35,7 @@ export default async function CompanySales() {
     </div>
     {error ? <p className="card mt-6 text-red-600">Не удалось загрузить клиентов: {error.message}</p> : clients.length ? <div className="mt-6 space-y-3">{clients.map((client) => <article className="card flex items-center gap-4" key={client.user_id}>
       <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-emerald-100 text-lg font-black text-emerald-800">{(client.profiles?.full_name ?? 'К').slice(0, 1).toUpperCase()}</div>
-      <div className="min-w-0 flex-1"><h2 className="truncate font-black">{client.profiles?.full_name ?? 'Клиент'}</h2><p className="truncate text-sm text-slate-500">{client.profiles?.phone ?? 'Телефон не указан'} · {client.profiles?.email ?? 'Email не указан'}</p><p className="mt-1 text-xs text-slate-400">Добавлен {new Date(client.created_at).toLocaleDateString('ru-KZ')}</p></div>
+      <div className="min-w-0 flex-1"><h2 className="break-words font-black">{client.profiles?.full_name ?? 'Клиент'}</h2><p className="break-all text-sm text-slate-500">{client.profiles?.phone ?? 'Телефон не указан'} · {client.profiles?.email ?? 'Email не указан'}</p><p className="mt-1 text-xs text-slate-400">Добавлен {new Date(client.created_at).toLocaleDateString('ru-KZ')}</p></div>
       <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">{client.profiles?.status ?? 'active'}</span>
     </article>)}</div> : <div className="card mt-6 text-center"><p className="text-lg font-black">Клиентов пока нет</p><p className="mt-2 text-sm text-slate-500">Передайте код компании клиенту. После регистрации он автоматически появится здесь.</p></div>}
   </div>;

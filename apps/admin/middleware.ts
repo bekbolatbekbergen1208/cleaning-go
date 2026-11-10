@@ -42,4 +42,6 @@ export async function middleware(request: NextRequest) {
   return secure(response);
 }
 
-export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'] };
+// The web manifest and icons must stay public: browsers fetch the manifest
+// without cookies, and "Add to Home Screen" on iPhone/Android happens before login.
+export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon|apple-icon|.*\\.(?:png|svg|ico|webp|jpg|jpeg)$).*)'] };
