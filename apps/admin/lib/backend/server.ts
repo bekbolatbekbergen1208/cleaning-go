@@ -2,6 +2,7 @@ import {
   createServerClient,
   type CookieOptions,
 } from '@cleaning-go/local-client';
+import { sessionCookieOptions } from '../request-security';
 import { cookies } from 'next/headers';
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 export async function createClient() {
@@ -15,7 +16,7 @@ export async function createClient() {
         setAll(items: CookieToSet[]) {
           try {
             items.forEach(({ name, value, options }) =>
-              store.set(name, value, options),
+              store.set(name, value, { ...options, ...sessionCookieOptions(), maxAge: options.maxAge }),
             );
           } catch {}
         },

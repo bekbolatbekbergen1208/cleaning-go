@@ -83,7 +83,7 @@ export default function CreateOrder() {
     handleSubmit,
     setValue,
     formState: { errors },
-  } = useForm<Form>({
+  } = useForm<z.input<typeof orderDraftSchema>, unknown, Form>({
     resolver: zodResolver(orderDraftSchema),
     defaultValues: {
       serviceId: demo ? initial.id : '00000000-0000-0000-0000-000000000000',

@@ -1,3 +1,4 @@
+import { privateFileUrl } from '../../../lib/private-files';
 import { createClient as createAdminClient } from '@cleaning-go/local-client';
 /* eslint-disable @next/next/no-img-element -- private signed URLs are short-lived and cannot use the shared image optimizer */
 import Link from 'next/link';
@@ -43,7 +44,7 @@ export default async function CompanyOrders() {
 
   const { data: orders, error } = await admin
     .from('orders')
-    .select('id,order_number,status,service_id,address_text,city,scheduled_at,area_sq_m,rooms_count,total_minor,executor_amount_minor,required_workers,price_confirmed_at,photo_urls,created_at,profiles!orders_client_id_fkey(full_name,phone)')
+    .select('id,order_number,status,service_id,address_text,city,scheduled_at,area_sq_m,rooms_count,subtotal_minor,total_minor,executor_amount_minor,required_workers,price_confirmed_at,photo_urls,created_at,profiles!orders_client_id_fkey(full_name,phone)')
     .eq('selected_company_id', company.id)
     .order('created_at', { ascending: false });
 
@@ -55,7 +56,7 @@ export default async function CompanyOrders() {
 
   const roomPhotos = new Map<string, string[]>();
   const photoEntries=(orders??[]).flatMap(order=>((order.photo_urls??[]) as string[]).filter(path=>!path.includes('/completion-')).map(path=>({orderId:order.id,path})));
-  if(photoEntries.length){const{data}=await admin.storage.from('order-photos').createSignedUrls(photoEntries.map(item=>item.path),3600);(data??[]).forEach((item,index)=>{if(!item.signedUrl)return;const orderId=photoEntries[index]?.orderId;if(!orderId)return;roomPhotos.set(orderId,[...(roomPhotos.get(orderId)??[]),item.signedUrl]);});}
+  if(photoEntries.length){const{data}=await admin.storage.from('order-photos').createSignedUrls(photoEntries.map(item=>item.path),3600);(data??[]).forEach((item,index)=>{if(!item.signedUrl)return;const orderId=photoEntries[index]?.orderId;if(!orderId)return;roomPhotos.set(orderId,[...(roomPhotos.get(orderId)??[]),privateFileUrl(item.signedUrl)]);});}
 
   return <div className="mx-auto max-w-5xl px-4 py-8"><LiveOrderUpdates companyId={company.id}/>
     <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-bold text-emerald-700">{company.name}</p><h1 className="text-3xl font-black">Заказы компании</h1></div><Link className="rounded-xl border px-4 py-2 font-bold" href="/company">← Кабинет</Link></div>
@@ -79,7 +80,7 @@ export default async function CompanyOrders() {
         </form> : waitingForClient ? <div className="mt-4 rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-700"><p>Ожидаем подтверждения цены клиентом</p><p className="mt-1">Клинеров: {order.required_workers} · Выплата: {(Number(order.executor_amount_minor) / 100).toLocaleString('ru-RU')} ₸</p></div> : order.status === 'accepted' ? <form action={updatePublishedOrder} className="mt-5 grid gap-3 rounded-2xl bg-blue-50 p-4 sm:grid-cols-2">
           <input type="hidden" name="order_id" value={order.id}/><p className="font-bold text-blue-700 sm:col-span-2">Заказ опубликован в общем сообществе клинеров</p>
           <label className="text-sm font-bold text-blue-900">Количество клинеров<input className="input mt-1 bg-white" name="required_workers" type="number" min="1" max="50" defaultValue={order.required_workers ?? 1} required/></label>
-          <label className="text-sm font-bold text-blue-900">Общая выплата клинерам, ₸<input className="input mt-1 bg-white" name="cleaner_amount_kzt" type="number" min="1" max={Number(order.total_minor)/100} defaultValue={Number(order.executor_amount_minor)/100} required/></label>
+          <label className="text-sm font-bold text-blue-900">Общая выплата клинерам, ₸<input className="input mt-1 bg-white" name="cleaner_amount_kzt" type="number" min="1" max={Number(order.subtotal_minor)/100} defaultValue={Number(order.executor_amount_minor)/100} required/></label>
           <p className="text-sm text-blue-700 sm:col-span-2">Выплата одному клинеру будет рассчитана из общей суммы.</p><button className="button sm:col-span-2">Сохранить количество и выплату</button>
         </form> : null}
       </article>;

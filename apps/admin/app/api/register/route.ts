@@ -88,6 +88,14 @@ export async function POST(request: NextRequest) {
         { status: 400, headers },
       );
     }
+    const referralCode = typeof body.referral_code === 'string'
+      ? body.referral_code.trim().toUpperCase()
+      : '';
+    if (
+      (body.referral_code !== undefined && typeof body.referral_code !== 'string') ||
+      (referralCode !== '' && !/^[A-Z0-9-]{4,32}$/.test(referralCode)) ||
+      (role === 'cleaner' && referralCode === '')
+    ) return NextResponse.json({ error: 'Проверьте код приглашения.' }, { status: 400, headers });
     if (
       role === 'company_owner' &&
       [
@@ -96,7 +104,7 @@ export async function POST(request: NextRequest) {
         'company_city',
         'company_address',
         'company_phone',
-      ].some((field) => !String(body[field] ?? '').trim())
+      ].some((field) => typeof body[field] !== 'string' || !String(body[field]).trim() || String(body[field]).length > 300)
     ) {
       return NextResponse.json(
         { error: 'Заполните все данные компании.' },
@@ -109,26 +117,12 @@ export async function POST(request: NextRequest) {
       process.env.LOCAL_SERVICE_KEY!,
       { auth: { persistSession: false, autoRefreshToken: false } },
     );
-    const { data: existingProfiles, error: profileLookupError } = await admin
-      .from('profiles')
-      .select('email,phone')
-      .or(`email.ilike.${email},phone.eq.${phone}`)
-      .limit(1);
-    if (profileLookupError)
-      return NextResponse.json(
-        { error: 'Не удалось проверить регистрационные данные.' },
-        { status: 503, headers },
-      );
-    if (
-      existingProfiles?.some(
-        (item) => item.email?.toLowerCase() === email || item.phone === phone,
-      )
-    ) {
-      return NextResponse.json(
-        { error: 'Аккаунт с такими данными уже существует.' },
-        { status: 409, headers },
-      );
-    }
+    const [byEmail, byPhone] = await Promise.all([
+      admin.from('profiles').select('id').eq('email', email).limit(1),
+      admin.from('profiles').select('id').eq('phone', phone).limit(1),
+    ]);
+    if (byEmail.error || byPhone.error) return NextResponse.json({ error: 'Не удалось проверить регистрационные данные.' }, { status: 503, headers });
+    if (byEmail.data?.length || byPhone.data?.length) return NextResponse.json({ error: 'Аккаунт с такими данными уже существует.' }, { status: 409, headers });
     if (role === 'company_owner') {
       const registrationNumber = String(
         body.company_registration_number,
@@ -159,7 +153,7 @@ export async function POST(request: NextRequest) {
         full_name: fullName,
         phone,
         role,
-        referral_code: body.referral_code || undefined,
+        referral_code: referralCode || undefined,
         company_name: body.company_name || undefined,
         company_registration_number:
           body.company_registration_number || undefined,
@@ -184,8 +178,8 @@ export async function POST(request: NextRequest) {
         { status: error.status === 422 ? 409 : 400, headers },
       );
     }
-    if (role === 'client' && body.referral_code) {
-      const code = String(body.referral_code).trim().toUpperCase();
+    if (role === 'client' && referralCode) {
+      const code = referralCode;
       const { data: company } = await admin
         .from('company_profiles')
         .select('id,owner_id')

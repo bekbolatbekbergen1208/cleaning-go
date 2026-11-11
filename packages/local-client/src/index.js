@@ -6,12 +6,14 @@ export function createClient(
   options = {},
 ) {
   url = url.replace(/\/$/, '');
+  const cookieProxy = url === '/api/local';
   const listeners =
     typeof document !== 'undefined' ? browserListeners : new Set();
   let memory = null;
   let sessionChanged = false;
   const storage = options.auth?.storage;
   async function token() {
+    if (cookieProxy) return '';
     if (sessionChanged && options.cookies) return memory?.access_token || '';
     if (options.cookies)
       return (
@@ -47,6 +49,7 @@ export function createClient(
           value: session?.access_token || '',
           options: {
             path: '/',
+            httpOnly: true,
             sameSite: 'lax',
             maxAge: session ? 604800 : 0,
             secure: url.startsWith('https:'),
@@ -57,7 +60,7 @@ export function createClient(
       if (session)
         await storage.setItem(SESSION_COOKIE, JSON.stringify(session));
       else await storage.removeItem(SESSION_COOKIE);
-    } else if (typeof document !== 'undefined')
+    } else if (typeof document !== 'undefined' && !cookieProxy)
       document.cookie = `${SESSION_COOKIE}=${session?.access_token || ''}; Path=/; SameSite=Lax; Max-Age=${session ? 604800 : 0}${location.protocol === 'https:' ? '; Secure' : ''}`;
     for (const callback of listeners)
       callback(session ? 'SIGNED_IN' : 'SIGNED_OUT', session);
@@ -232,6 +235,7 @@ export function createClient(
       return auth.verifyOtp({ token_hash: code });
     },
     async setSession(session) {
+      if (cookieProxy) return { data: null, error: { message: 'Use a recovery link to sign in', status: 400 } };
       await save(session);
       return auth.getSession();
     },
@@ -282,7 +286,7 @@ export function createClient(
               ...item,
               signedUrl: item.signedUrl
                 ? item.signedUrl.startsWith('/')
-                  ? `${url}${item.signedUrl}`
+                  ? cookieProxy ? item.signedUrl : `${url}${item.signedUrl}`
                   : item.signedUrl
                 : null,
             }));

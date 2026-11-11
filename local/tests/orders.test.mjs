@@ -134,7 +134,7 @@ test('orders: client → cleaner → GPS → completion → payment → idempote
     ok(
       await customer.storage
         .from('order-photos')
-        .upload(photo, new Blob(['test'], { type: 'image/png' })),
+        .upload(photo, new Blob([Buffer.from([137,80,78,71,13,10,26,10])], { type: 'image/png' })),
     );
     const payload = {
       service_id: '10000000-0000-0000-0000-000000000001',
@@ -232,6 +232,14 @@ test('orders: client → cleaner → GPS → completion → payment → idempote
     const first = ok(await customer.rpc('create_review', review));
     const second = ok(await customer.rpc('create_review', review));
     assert.equal(first.id, second.id);
+    ok(await admin.from('reviews').update({ is_visible: false }).eq('id', first.id));
+    let moderatedRating = ok(await admin.from('cleaner_profiles').select('rating,reviews_count').eq('user_id', cleanerUser.id).single());
+    assert.equal(Number(moderatedRating.rating), 0);
+    assert.equal(moderatedRating.reviews_count, 0);
+    ok(await admin.from('reviews').update({ is_visible: true }).eq('id', first.id));
+    moderatedRating = ok(await admin.from('cleaner_profiles').select('rating,reviews_count').eq('user_id', cleanerUser.id).single());
+    assert.equal(Number(moderatedRating.rating), 5);
+    assert.equal(moderatedRating.reviews_count, 1);
     const nested = ok(
       await customer
         .from('orders')
@@ -281,18 +289,18 @@ test('orders: client → cleaner → GPS → completion → payment → idempote
     assert.ok(
       (
         await cleaner.rpc('confirm_company_order_price', {
-          target_order_id: companyOrder.id,
+          target_order_id: companyOrder.id, expected_quote_version: priced.quote_version,
         })
       ).error,
     );
     ok(
       await customer.rpc('confirm_company_order_price', {
-        target_order_id: companyOrder.id,
+        target_order_id: companyOrder.id, expected_quote_version: priced.quote_version,
       }),
     );
     ok(
       await customer.rpc('confirm_company_order_price', {
-        target_order_id: companyOrder.id,
+        target_order_id: companyOrder.id, expected_quote_version: priced.quote_version,
       }),
     );
     ok(
@@ -330,18 +338,17 @@ test('orders: client → cleaner → GPS → completion → payment → idempote
     );
     assert.equal(counts.community_companies[0].count, 1);
     assert.equal(counts.community_cleaners[0].count, 1);
-    for (const next_status of [
-      'on_the_way',
-      'arrived',
-      'in_progress',
-      'completed_by_cleaner',
-    ])
-      ok(
-        await cleaner.rpc('transition_order_status', {
-          target_order_id: companyOrder.id,
-          next_status,
-        }),
-      );
+    assert.ok((await customer.rpc('advance_company_order', { target_order_id: companyOrder.id })).error);
+    assert.ok((await cleaner.rpc('update_published_company_order', { target_order_id: companyOrder.id, target_required_workers: 1, target_cleaner_amount_minor: 100 })).error);
+    ok(await owner.rpc('update_published_company_order', { target_order_id: companyOrder.id, target_required_workers: 2, target_cleaner_amount_minor: priced.executor_amount_minor }));
+    for (const [expected_status, status] of [['accepted', 'on_the_way'], ['on_the_way', 'arrived'], ['arrived', 'in_progress']]) {
+      assert.equal(ok(await cleaner.rpc('advance_company_order', { target_order_id: companyOrder.id, expected_status })).status, status);
+    }
+    assert.ok((await cleaner.rpc('transition_order_status', { target_order_id: companyOrder.id, next_status: 'completed_by_cleaner' })).error, 'direct RPC cannot bypass the photo report');
+    assert.ok((await cleaner.rpc('advance_company_order', { target_order_id: companyOrder.id, expected_status: 'in_progress', completion_paths: [`${cleanerUser.id}/completion-${companyOrder.id}-fake.png`] })).error);
+    const completionPath = `${cleanerUser.id}/completion-${companyOrder.id}-report.png`;
+    ok(await cleaner.storage.from('order-photos').upload(completionPath, new Blob([Buffer.from([137,80,78,71,13,10,26,10])], { type: 'image/png' })));
+    assert.equal(ok(await cleaner.rpc('advance_company_order', { target_order_id: companyOrder.id, expected_status: 'in_progress', completion_paths: [completionPath] })).status, 'completed_by_cleaner');
     const companyDone = ok(
       await customer.rpc('transition_order_status', {
         target_order_id: companyOrder.id,
@@ -472,7 +479,7 @@ test('orders: client → cleaner → GPS → completion → payment → idempote
     const bonusOrder=ok(await customer.rpc('create_order_with_bonus',{payload:{...payload,selected_cleaner_id:null,selected_company_id:company.id,bonus_amount_minor:100000}}));
     assert.equal(Number(bonusOrder.requested_company_bonus_minor),100000);
     ok(await owner.rpc('set_company_order_price',{target_order_id:bonusOrder.id,target_total_minor:1000000,target_required_workers:1}));
-    const bonusConfirmed=ok(await customer.rpc('confirm_company_order_price',{target_order_id:bonusOrder.id}));
+    const bonusConfirmed=ok(await customer.rpc('confirm_company_order_price',{target_order_id:bonusOrder.id,expected_quote_version:1}));
     assert.equal(Number(bonusConfirmed.total_minor),900000);
     assert.equal(Number(bonusConfirmed.company_bonus_used_minor),100000);
     ok(await admin.from('orders').update({status:'cancelled'}).eq('id',bonusOrder.id));

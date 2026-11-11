@@ -125,57 +125,10 @@ export async function updatePublishedOrder(formData: FormData) {
     throw new Error('Укажите выплату не менее 1 ₸ каждому клинеру');
 
   const backend = await createClient();
-  const {
-    data: { user },
-  } = await backend.auth.getUser();
-  if (!user) throw new Error('Сначала войдите в аккаунт');
-  const admin = createAdminClient(
-    process.env.LOCAL_API_URL || 'http://127.0.0.1:54321',
-    process.env.LOCAL_SERVICE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } },
-  );
-  const { data: company, error: companyError } = await admin
-    .from('company_profiles')
-    .select('id')
-    .eq('owner_id', user.id)
-    .maybeSingle();
-  if (companyError) throw new Error(companyError.message);
-  if (!company) throw new Error('Компания не найдена');
-
-  const { data: order } = await admin
-    .from('orders')
-    .select('id,total_minor')
-    .eq('id', orderId)
-    .eq('selected_company_id', company.id)
-    .eq('status', 'accepted')
-    .maybeSingle();
-  if (!order) throw new Error('Опубликованный заказ не найден');
-  if (cleanerAmountMinor > Number(order.total_minor))
-    throw new Error('Выплата клинерам не может превышать цену заказа');
-
-  const { count: occupiedWorkers } = await admin
-    .from('order_workers')
-    .select('cleaner_id', { count: 'exact', head: true })
-    .eq('order_id', orderId);
-  if (requiredWorkers < (occupiedWorkers ?? 0))
-    throw new Error(`Уже назначено клинеров: ${occupiedWorkers}`);
-
-  const { data: updatedOrder, error } = await admin
-    .from('orders')
-    .update({
-      required_workers: requiredWorkers,
-      executor_amount_minor: cleanerAmountMinor,
-    })
-    .eq('id', orderId)
-    .eq('selected_company_id', company.id)
-    .eq('status', 'accepted')
-    .select('id')
-    .maybeSingle();
+  const { error } = await backend.rpc('update_published_company_order', {
+    target_order_id: orderId, target_required_workers: requiredWorkers, target_cleaner_amount_minor: cleanerAmountMinor,
+  });
   if (error) throw new Error(error.message);
-  if (!updatedOrder)
-    throw new Error(
-      'Заказ уже изменился. Обновите страницу и повторите попытку',
-    );
 
   revalidatePath('/company/orders');
   revalidatePath('/cleaner/company-orders');

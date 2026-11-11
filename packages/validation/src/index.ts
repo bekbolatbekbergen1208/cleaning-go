@@ -10,8 +10,8 @@ export const registrationSchema = z
     fullName: z.string().trim().min(2, 'Укажите имя'),
     role: z.enum(publicRegistrationRoles),
     referralCode: z.string().trim().toUpperCase().optional(),
-    acceptedTerms: z.literal(true, { errorMap: () => ({ message: 'Примите соглашение' }) }),
-    acceptedPrivacy: z.literal(true, { errorMap: () => ({ message: 'Примите политику' }) }),
+    acceptedTerms: z.literal(true, { error: 'Примите соглашение' }),
+    acceptedPrivacy: z.literal(true, { error: 'Примите политику' }),
   })
   .refine((value) => value.email || value.phone, {
     message: 'Укажите email или телефон',

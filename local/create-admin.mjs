@@ -19,13 +19,13 @@ try {
           'insert into auth.users(email,encrypted_password,raw_user_meta_data) values($1,$2,$3) returning id',
           [
             email,
-            passwordHash(password),
+            await passwordHash(password),
             { full_name: 'Администратор', role: 'client' },
           ],
         )
       ).rows[0].id;
     await tx.query('update auth.users set encrypted_password=$1 where id=$2', [
-      passwordHash(password),
+      await passwordHash(password),
       id,
     ]);
     await tx.query(

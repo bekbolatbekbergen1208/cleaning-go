@@ -169,12 +169,29 @@ export default function OrderDetail() {
       setOrder((current) => (current ? { ...current, status } : current));
       return;
     }
-    const { error } = await backend.rpc('transition_order_status', {
-      target_order_id: id,
-      next_status: status,
-      note: null,
-    });
-    if (error) return Alert.alert('Переход недоступен', error.message);
+    let completionPaths: string[] = [];
+    if (isCleaner && order?.selected_company_id && status === 'completed_by_cleaner') {
+      try {
+        const picker = await import('expo-image-picker');
+        const permission = await picker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) return Alert.alert('Фотоотчёт', 'Разрешите выбор фото для завершения заказа.');
+        const photo = await picker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+        if (photo.canceled || !photo.assets[0]) return;
+        const { data: { user } } = await backend.auth.getUser();
+        if (!user) return Alert.alert('Нужно войти');
+        const asset = photo.assets[0];
+        const file = await (await fetch(asset.uri)).blob();
+        const path = `${user.id}/completion-${id}-${Date.now()}.jpg`;
+        const { error: uploadError } = await backend.storage.from('order-photos').upload(path, file, { contentType: asset.mimeType || 'image/jpeg' });
+        if (uploadError) return Alert.alert('Фотоотчёт', uploadError.message);
+        completionPaths = [path];
+      } catch { return Alert.alert('Фотоотчёт', 'Не удалось загрузить фото. Повторите попытку.'); }
+    }
+    const companyStep = isCleaner && order?.selected_company_id && ['on_the_way', 'arrived', 'in_progress', 'completed_by_cleaner'].includes(status);
+    const { error } = companyStep
+      ? await backend.rpc('advance_company_order', { target_order_id: id, completion_paths: completionPaths, expected_status: order?.status })
+      : await backend.rpc('transition_order_status', { target_order_id: id, next_status: status, note: null });
+    if (error) { void load(); return Alert.alert('Переход недоступен', error.message); }
     void load();
     if (status === 'on_the_way') {
       const destination = [order?.city, order?.address_text]
@@ -193,10 +210,10 @@ export default function OrderDetail() {
   }
   async function confirmPrice() {
     const { error } = await backend.rpc('confirm_company_order_price', {
-      target_order_id: id,
+      target_order_id: id, expected_quote_version: order?.quote_version,
     });
     if (error) Alert.alert('Не удалось подтвердить цену', error.message);
-    else void load();
+    void load();
   }
 
   async function openDispute() {

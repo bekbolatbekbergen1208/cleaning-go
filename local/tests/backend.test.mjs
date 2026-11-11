@@ -21,7 +21,7 @@ test('local backend: migrations, auth, RLS, catalog, relations, files, recovery 
     assert.equal(
       (await app.db.query('select count(*) from local_migrations')).rows[0]
         .count,
-      37,
+      41,
     );
     let r = await anon.from('cleaning_services').select('*');
     assert.equal(r.error, null);
@@ -122,26 +122,26 @@ test('local backend: migrations, auth, RLS, catalog, relations, files, recovery 
       .select('id')
       .or(`email.eq.${first.email},id.in.(${second.id})`);
     assert.equal(r.error, null);
-    assert.equal(r.data.length, 2);
+    assert.equal(r.data.length, 1);
     r = await client
       .from('profiles')
       .select('id', { count: 'exact', head: true });
-    assert.equal(r.count, 2);
+    assert.equal(r.count, 1);
     const path = `${first.id}/test.png`;
     r = await client.storage
       .from('order-photos')
-      .upload(path, new Blob(['image'], { type: 'image/png' }));
+      .upload(path, new Blob([Buffer.from([137,80,78,71,13,10,26,10])], { type: 'image/png' }));
     assert.equal(r.error, null, JSON.stringify(r));
     assert.ok(
       (
         await stranger.storage
           .from('order-photos')
-          .upload(path, new Blob(['image'], { type: 'image/png' }))
+          .upload(path, new Blob([Buffer.from([137,80,78,71,13,10,26,10])], { type: 'image/png' }))
       ).error,
     );
     r = await client.storage.from('order-photos').createSignedUrls([path], 60);
     assert.equal(r.error, null);
-    assert.equal(await (await fetch(r.data[0].signedUrl)).text(), 'image');
+    assert.deepEqual(Buffer.from(await (await fetch(r.data[0].signedUrl)).arrayBuffer()), Buffer.from([137,80,78,71,13,10,26,10]));
     r = await stranger.storage
       .from('order-photos')
       .createSignedUrls([path], 60);

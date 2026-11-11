@@ -1,8 +1,9 @@
 const ident = (value) => {
-  if (!/^[a-z_][a-z_0-9]*$/i.test(value)) throw new Error('Invalid identifier');
+  if (typeof value !== 'string' || value.length > 63 || !/^[a-z_][a-z_0-9]*$/i.test(value)) throw new Error('Invalid identifier');
   return `"${value}"`;
 };
 export function splitFields(value) {
+  if (typeof value !== 'string' || value.length > 4096) throw new Error('Invalid fields');
   let depth = 0,
     start = 0;
   const fields = [];
@@ -14,16 +15,21 @@ export function splitFields(value) {
       start = i + 1;
     }
   }
-  if (depth !== 0) throw new Error('Invalid fields');
+  if (fields.length > 100 || depth !== 0) throw new Error('Invalid fields');
   return [...fields, value.slice(start)].map((f) => f.trim()).filter(Boolean);
 }
 export async function queryDatabase(tx, plan) {
+  if (!plan || typeof plan !== 'object' || Array.isArray(plan) ||
+    (plan.filters && (!Array.isArray(plan.filters) || plan.filters.length > 50)) ||
+    (plan.orders && (!Array.isArray(plan.orders) || plan.orders.length > 10)) ||
+    (Array.isArray(plan.values) && plan.values.length > 100)) throw new Error('Invalid query');
   const params = [];
   const bind = (value) => {
     params.push(value);
     return `$${params.length}`;
   };
   const table = ident(plan.table);
+  const readableTable = name => ident(name === 'profiles' ? 'api_profiles' : name);
   if (plan.table === 'local_migrations') throw new Error('Private table');
   let aliasIndex = 0;
   const relationships = (
@@ -75,8 +81,8 @@ export async function queryDatabase(tx, plan) {
             ? 'count(*)::integer as count'
             : fields(target, a, nested, depth + 1);
         return forward
-          ? `(select row_to_json(j) from (select ${selection} from public.${ident(target)} ${a} where ${condition} limit 1) j) as ${ident(label)}`
-          : `(select coalesce(json_agg(j),'[]'::json) from (select ${selection} from public.${ident(target)} ${a} where ${condition}) j) as ${ident(label)}`;
+          ? `(select row_to_json(j) from (select ${selection} from public.${readableTable(target)} ${a} where ${condition} limit 1) j) as ${ident(label)}`
+          : `(select coalesce(json_agg(j),'[]'::json) from (select ${selection} from public.${readableTable(target)} ${a} where ${condition} limit 1000) j) as ${ident(label)}`;
       })
       .join(',');
   }
@@ -114,7 +120,7 @@ export async function queryDatabase(tx, plan) {
         throw new Error('Invalid IS');
       sql = `${col} is ${String(f.value)}`;
     } else if (f.op === 'in') {
-      if (!Array.isArray(f.value)) throw new Error('Invalid IN');
+      if (!Array.isArray(f.value) || f.value.length > 1000) throw new Error('Invalid IN');
       sql = f.value.length
         ? `${col} in (${f.value.map(bind).join(',')})`
         : 'false';
@@ -133,14 +139,14 @@ export async function queryDatabase(tx, plan) {
       )
       .join(',');
     const limit = Math.min(
-      Number.isInteger(plan.limit) && plan.limit >= 0 ? plan.limit : 10000,
-      10000,
+      Number.isInteger(plan.limit) && plan.limit >= 0 ? plan.limit : 1000,
+      1000,
     );
     const count = plan.count
       ? Number(
           (
             await tx.query(
-              `select count(*) from public.${table} t${where}`,
+              `select count(*) from public.${readableTable(plan.table)} t${where}`,
               params,
             )
           ).rows[0].count,
@@ -150,7 +156,7 @@ export async function queryDatabase(tx, plan) {
       ? []
       : (
           await tx.query(
-            `select ${selection} from public.${table} t${where}${order ? ` order by ${order}` : ''} limit ${limit}`,
+            `select ${selection} from public.${readableTable(plan.table)} t${where}${order ? ` order by ${order}` : ''} limit ${limit}`,
             params,
           )
         ).rows;
@@ -189,6 +195,7 @@ export async function queryDatabase(tx, plan) {
   return result;
 }
 export async function callFunction(tx, name, args = {}) {
+  if (!args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).length > 20) throw new Error('Invalid arguments');
   const keys = Object.keys(args);
   const functions = (
     await tx.query(
@@ -203,7 +210,7 @@ export async function callFunction(tx, name, args = {}) {
   if (!fn) throw new Error('Unknown function');
   // Expose business operations only, never trigger/internal security helpers.
   if (
-    !/^(propose_company_order_price|confirm_company_order_price|accept_order|apply_company_promo_code|apply_invitation_code|choose_company|claim_company_order|create_order|create_order_with_bonus|create_review|decide_company_membership|get_my_company_report|join_cleaner_community|join_company_community|preview_invitation_code|open_dispute|set_cleaner_workday|set_company_order_price|set_my_company_cashback|set_my_company_welcome_bonus|transition_order_status|update_cleaner_location)$/.test(
+    !/^(advance_company_order|update_published_company_order|propose_company_order_price|confirm_company_order_price|accept_order|apply_company_promo_code|apply_invitation_code|choose_company|claim_company_order|create_order|create_order_with_bonus|create_review|decide_company_membership|get_my_company_report|join_cleaner_community|join_company_community|preview_invitation_code|open_dispute|set_cleaner_workday|set_company_order_price|set_my_company_cashback|set_my_company_welcome_bonus|transition_order_status|update_cleaner_location)$/.test(
       name,
     )
   )

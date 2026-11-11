@@ -18,15 +18,20 @@ export function ReviewForm({ orderId }: { orderId: string }) {
     submitting.current = true;
     setBusy(true);
     setError('');
-    const result = await publishReview(orderId, rating, text);
-    if (result.error) {
-      setError(result.error);
+    try {
+      const result = await publishReview(orderId, rating, text);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.replace('/profile');
+      router.refresh();
+    } catch {
+      setError('Не удалось отправить отзыв. Проверьте соединение и повторите.');
+    } finally {
       submitting.current = false;
       setBusy(false);
-      return;
     }
-    router.replace('/profile');
-    router.refresh();
   }
 
   return (
@@ -60,6 +65,7 @@ export function ReviewForm({ orderId }: { orderId: string }) {
         <textarea
           className="input mt-1"
           rows={4}
+          maxLength={2000}
           value={text}
           onChange={(event) => setText(event.target.value)}
           placeholder="Расскажите о качестве уборки"

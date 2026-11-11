@@ -51,6 +51,8 @@ export interface Order {
   order_number: string;
   client_id: string;
   service_id: string;
+  selected_company_id?: string | null;
+  quote_version?: number;
   city: string;
   address_text: string;
   scheduled_at: string;

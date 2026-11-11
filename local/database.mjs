@@ -71,6 +71,7 @@ export async function openDatabase(
   await db.exec(`
     grant usage on schema public,auth,storage to authenticated,anon,service_role;
     grant all on all tables in schema public,storage to authenticated,service_role;
+    revoke all on storage.buckets from authenticated,anon;
     grant usage,select on all sequences in schema public,storage to authenticated,service_role;
     grant select on public.cleaning_services,public.service_options to anon;
     revoke all on public.local_migrations from authenticated,anon;

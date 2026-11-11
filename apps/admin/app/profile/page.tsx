@@ -1,3 +1,4 @@
+import { privateFileUrl } from '../../lib/private-files';
 import { redirect } from 'next/navigation';
 /* eslint-disable @next/next/no-img-element -- private signed URLs are short-lived and cannot use the shared image optimizer */
 import Link from 'next/link';
@@ -63,7 +64,7 @@ export default async function ProfilePage() {
     backend
       .from('orders')
       .select(
-        'id,order_number,status,scheduled_at,total_minor,price_confirmed_at,photo_urls,reviews(id)',
+        'id,order_number,status,scheduled_at,total_minor,price_confirmed_at,quote_version,photo_urls,reviews(id)',
       )
       .eq('client_id', user.id)
       .order('created_at', { ascending: false })
@@ -178,7 +179,7 @@ export default async function ProfilePage() {
       if (!orderId) return;
       completionPhotos.set(orderId, [
         ...(completionPhotos.get(orderId) ?? []),
-        item.signedUrl,
+        privateFileUrl(item.signedUrl),
       ]);
     });
   }
@@ -390,7 +391,7 @@ export default async function ProfilePage() {
                     </p>
                     {order.status === 'offered' &&
                       !order.price_confirmed_at && (
-                        <ConfirmPriceForm orderId={order.id} price={money(order.total_minor)} />
+                        <ConfirmPriceForm orderId={order.id} quoteVersion={Number(order.quote_version)} price={money(order.total_minor)} />
                       )}
                     {order.status === 'offered' && order.price_confirmed_at && (
                       <p className="mt-2 text-xs font-semibold text-emerald-700">

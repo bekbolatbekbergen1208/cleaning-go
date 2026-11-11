@@ -2,26 +2,27 @@ import { createServer } from 'node:http';
 import {
   randomBytes,
   createHash,
-  scryptSync,
+  scrypt,
   timingSafeEqual,
   createHmac,
 } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, chmod } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
+import { createLimiter, httpError, readBody, validFileBytes } from './security.mjs';
 import { openDatabase } from './database.mjs';
 import { queryDatabase, callFunction } from './query.mjs';
 const hash = (text) => createHash('sha256').update(text).digest('hex');
-export const passwordHash = (password) => {
+const deriveKey = promisify(scrypt);
+export const passwordHash = async (password) => {
   const salt = randomBytes(16).toString('hex');
-  return `${salt}:${scryptSync(password, salt, 64).toString('hex')}`;
+  return `${salt}:${(await deriveKey(password, salt, 64)).toString('hex')}`;
 };
-const passwordMatches = (password, stored) => {
-  const [salt, key] = stored.split(':');
-  return (
-    !!key &&
-    timingSafeEqual(scryptSync(password, salt, 64), Buffer.from(key, 'hex'))
-  );
+const passwordMatches = async (password, stored) => {
+  const [salt, key] = String(stored).split(':');
+  if (!/^[a-f0-9]{32}$/.test(salt) || !/^[a-f0-9]{128}$/.test(key)) return false;
+  return timingSafeEqual(await deriveKey(password, salt, 64), Buffer.from(key, 'hex'));
 };
 export async function startServer({
   port = Number(process.env.LOCAL_API_PORT || 54321),
@@ -34,19 +35,29 @@ export async function startServer({
       'Run node local/setup.mjs first: LOCAL_SERVICE_KEY is required',
     );
   const root = resolve(dataDir);
-  await mkdir(root, { recursive: true });
+  await mkdir(root, { recursive: true, mode: 0o700 });
+  await chmod(root, 0o700);
   const db = database || (await openDatabase(resolve(root, 'db')));
   const limits = new Map();
+  const limiter = createLimiter();
+  const dummyPassword = await passwordHash(randomBytes(32).toString("hex"));
+  let activePasswordJobs = 0;
+  async function passwordJob(fn) {
+    if (activePasswordJobs >= 4) throw httpError("Authentication busy. Try again.", 429);
+    activePasswordJobs++;
+    try { return await fn(); } finally { activePasswordJobs--; }
+  }
   const tooMany = () =>
     Object.assign(new Error('Слишком много запросов. Попробуйте позже.'), {
       status: 429,
     });
   function hit(key) {
     const now = Date.now();
-    if (limits.size > 10000)
-      for (const [k, v] of limits) if (v.until < now) limits.delete(k);
+    if (limits.size >= 10000)
+      for (const [k, v] of limits) if (v.until <= now) limits.delete(k);
     const v = limits.get(key);
     if (!v || v.until < now) {
+      if (!v && limits.size >= 10000) throw tooMany();
       limits.set(key, { count: 1, until: now + 900000 });
       return 1;
     }
@@ -69,13 +80,15 @@ export async function startServer({
     phone: u.phone,
     user_metadata: u.raw_user_meta_data,
   });
-  async function session(user) {
+  async function session(user, recovery = false) {
     const token = randomBytes(32).toString('hex');
-    const expires = Date.now() + 7 * 86400000;
-    await db.query('insert into auth.sessions values($1,$2,$3)', [
+    const expires = Date.now() + (recovery ? 15 * 60000 : 7 * 86400000);
+    await db.query('delete from auth.sessions where expires_at<=now()');
+    await db.query('insert into auth.sessions(token_hash,user_id,expires_at,is_recovery) values($1,$2,$3,$4)', [
       hash(token),
       user.id,
       new Date(expires).toISOString(),
+      recovery,
     ]);
     return {
       access_token: token,
@@ -91,7 +104,7 @@ export async function startServer({
     const token = (req.headers.authorization || '').replace(/^Bearer /, '');
     if (!token) return { admin: false, user: null };
     const { rows } = await db.query(
-      `select u.* from auth.sessions s join auth.users u on u.id=s.user_id join public.profiles p on p.id=u.id where s.token_hash=$1 and s.expires_at>now() and p.status='active'`,
+      `select u.*,s.is_recovery from auth.sessions s join auth.users u on u.id=s.user_id join public.profiles p on p.id=u.id where s.token_hash=$1 and s.expires_at>now() and p.status='active'`,
       [hash(token)],
     );
     return { admin: false, user: rows[0] || null };
@@ -107,7 +120,7 @@ export async function startServer({
       return fn(tx);
     });
   }
-  const server = createServer(async (req, res) => {
+  const server = createServer({ maxHeaderSize: 16384, requestTimeout: 30000, headersTimeout: 10000, keepAliveTimeout: 5000 }, async (req, res) => {
     const origin = req.headers.origin;
     const allowed = (
       process.env.LOCAL_ALLOWED_ORIGINS ||
@@ -127,6 +140,8 @@ export async function startServer({
     res.setHeader('Access-Control-Allow-Methods', 'POST,GET,OPTIONS');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('X-Frame-Options', 'DENY');
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
       res.end();
@@ -137,6 +152,7 @@ export async function startServer({
       res.end(JSON.stringify(value));
     };
     try {
+      if (limiter.hit(`request:${req.socket.remoteAddress}`, 1200, 60000)) throw tooMany();
       const url = new URL(req.url, 'http://localhost');
       if (url.pathname === '/health' && req.method === 'GET') {
         send({ ok: true, database: 'local-postgresql' });
@@ -151,9 +167,11 @@ export async function startServer({
           .update(`${bucket}:${path}:${expires}`)
           .digest('hex');
         if (
-          !sig ||
+          !/^[a-f0-9]{64}$/.test(sig || '') ||
           sig.length !== expected.length ||
           !timingSafeEqual(Buffer.from(sig), Buffer.from(expected)) ||
+          !/^\d{13}$/.test(expires || "") ||
+          !Number.isSafeInteger(Number(expires)) ||
           Number(expires) < Date.now()
         )
           throw Object.assign(new Error('Expired file link'), { status: 403 });
@@ -168,7 +186,8 @@ export async function startServer({
         res.writeHead(200, {
           'Content-Type':
             object?.metadata?.mimetype || 'application/octet-stream',
-          'Content-Disposition': 'inline',
+          'Content-Disposition': object?.metadata?.mimetype === 'application/pdf' ? 'attachment' : 'inline',
+          'Content-Security-Policy': "sandbox; default-src 'none'; frame-ancestors 'none'",
         });
         res.end(file);
         return;
@@ -178,18 +197,14 @@ export async function startServer({
         return;
       }
       const who = await identity(req);
-      const chunks = [];
-      let size = 0;
-      for await (const chunk of req) {
-        size += chunk.length;
-        if (size > 16 * 1024 * 1024)
-          throw Object.assign(new Error('Request too large'), { status: 413 });
-        chunks.push(chunk);
-      }
-      const raw = Buffer.concat(chunks);
+      if (url.pathname === '/upload' && who.user?.is_recovery) throw httpError('Complete password recovery first', 403);
+      if (url.pathname === '/upload' && !who.user) throw httpError('Sign in required', 401);
+      const raw = await readBody(req, url.pathname === '/upload' ? 16 * 1024 * 1024 : 65536);
+      const size = raw.length;
       if (url.pathname === '/upload') {
         if (!who.user)
           throw Object.assign(new Error('Sign in required'), { status: 401 });
+        if (limiter.hit(`upload:${who.user.id}`, 30, 60000)) throw tooMany();
         const bucket = req.headers['x-bucket'],
           path = req.headers['x-path'];
         validatePath(bucket, path);
@@ -204,6 +219,7 @@ export async function startServer({
         if (
           !config ||
           size > Number(config.file_size_limit) ||
+          !validFileBytes(type, raw) ||
           (config.allowed_mime_types &&
             !config.allowed_mime_types.includes(type))
         )
@@ -216,7 +232,7 @@ export async function startServer({
             [bucket, path, { mimetype: type, size }],
           ),
         );
-        await writeFile(file, raw);
+        await writeFile(file, raw, { mode: 0o600 });
         send({ data: { path }, error: null });
         return;
       }
@@ -224,7 +240,11 @@ export async function startServer({
         send({ error: { message: 'Not found' } }, 404);
         return;
       }
-      const body = JSON.parse(raw.toString() || '{}');
+      if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) throw httpError('JSON content type required', 415);
+      let body;
+      try { body = JSON.parse(raw.toString()); } catch { throw httpError('Invalid JSON'); }
+      if (!body || typeof body !== 'object' || Array.isArray(body) || typeof body.action !== 'string') throw httpError('Invalid request');
+      if (who.user?.is_recovery && !['getUser', 'getSession', 'updateUser', 'signOut'].includes(body.action)) throw httpError('Complete password recovery first', 403);
       if (body.action === 'query') {
         send(await scoped(who, (tx) => queryDatabase(tx, body.plan)));
         return;
@@ -241,15 +261,17 @@ export async function startServer({
           .toLowerCase();
         const loginKey = `login:${req.socket.remoteAddress}:${email}`;
         if (loginBlocked(loginKey)) throw tooMany();
-        const password = String(body.password || '');
-        if (password.length > 256) throw new Error('Invalid credentials');
+        if (typeof body.email !== 'string' || email.length > 254 || typeof body.password !== 'string' || !body.password || body.password.length > 256) throw httpError('Invalid credentials', 401);
+        const password = body.password;
+        if (limiter.hit(`password:${req.socket.remoteAddress}`, 100, 60000)) throw tooMany();
         const u = (
           await db.query(
             "select u.* from auth.users u join public.profiles p on p.id=u.id where lower(u.email)=$1 and p.status='active'",
             [email],
           )
         ).rows[0];
-        if (!u || !passwordMatches(password, u.encrypted_password)) {
+        const matches = await passwordJob(() => passwordMatches(password, u?.encrypted_password || dummyPassword));
+        if (!u || !matches) {
           hit(loginKey);
           throw Object.assign(new Error('Неверный email или пароль'), {
             status: 401,
@@ -290,6 +312,7 @@ export async function startServer({
           throw Object.assign(new Error('Forbidden'), { status: 403 });
         const u = body.user;
         if (
+          !u || typeof u.email !== 'string' || u.email.length > 254 ||
           !/^\S+@\S+\.\S+$/.test(u.email) ||
           typeof u.password !== 'string' ||
           u.password.length < 8 ||
@@ -302,7 +325,7 @@ export async function startServer({
             [
               u.email.toLowerCase(),
               u.phone || null,
-              passwordHash(u.password),
+              await passwordJob(() => passwordHash(u.password)),
               u.user_metadata || {},
             ],
           )
@@ -318,20 +341,24 @@ export async function startServer({
           body.password.length > 256
         )
           throw new Error('Sign in and use at least 8 characters');
+        rate(`password-update:${who.user.id}`, 10);
+        if (!who.user.is_recovery && (typeof body.currentPassword !== 'string' || body.currentPassword.length > 256 || !await passwordJob(() => passwordMatches(body.currentPassword, who.user.encrypted_password)))) throw httpError('Current password required', 403);
         await db.transaction(async (tx) => {
           await tx.query(
             'update auth.users set encrypted_password=$1 where id=$2',
-            [passwordHash(body.password), who.user.id],
+            [await passwordJob(() => passwordHash(body.password)), who.user.id],
           );
           await tx.query('delete from auth.sessions where user_id=$1', [
             who.user.id,
           ]);
         });
+        await db.query('delete from auth.recoveries where user_id=$1', [who.user.id]);
         const s = await session(who.user);
         send({ data: { user: s.user, session: s }, error: null });
         return;
       }
       if (body.action === 'recover') {
+        if (typeof body.email !== 'string' || body.email.length > 254) throw httpError('Invalid email');
         rate(`recovery:${req.socket.remoteAddress}`, 5);
         const u = (
           await db.query(
@@ -341,6 +368,7 @@ export async function startServer({
         ).rows[0];
         if (u) {
           const token = randomBytes(32).toString('hex');
+          await db.query('delete from auth.recoveries where user_id=$1', [u.id]);
           await db.query('insert into auth.recoveries values($1,$2,$3)', [
             hash(token),
             u.id,
@@ -368,6 +396,7 @@ export async function startServer({
         return;
       }
       if (body.action === 'verifyRecovery') {
+        if (typeof body.token_hash !== 'string' || !/^[a-f0-9]{64}$/.test(body.token_hash)) throw httpError('Invalid or expired recovery link');
         rate(`verify:${req.socket.remoteAddress}`);
         const u = await db.transaction(async (tx) => {
           const r = (
@@ -378,20 +407,21 @@ export async function startServer({
           ).rows[0];
           return r
             ? (
-                await tx.query('select * from auth.users where id=$1', [
+                await tx.query("select u.* from auth.users u join profiles p on p.id=u.id where u.id=$1 and p.status='active'", [
                   r.user_id,
                 ])
               ).rows[0]
             : null;
         });
         if (!u) throw new Error('Invalid or expired recovery link');
-        const s = await session(u);
+        const s = await session(u, true);
         send({ data: { user: s.user, session: s }, error: null });
         return;
       }
       if (body.action === 'signedUrls') {
         if (!who.admin && !who.user)
           throw Object.assign(new Error('Forbidden'), { status: 403 });
+        if (!Array.isArray(body.paths) || body.paths.length > 50 || !Number.isFinite(body.expires) || body.expires <= 0) throw httpError('Invalid file link request');
         const data = [];
         for (const path of body.paths) {
           validatePath(body.bucket, path);
@@ -420,11 +450,15 @@ export async function startServer({
       }
       throw new Error('Unknown action');
     } catch (error) {
+      if (res.headersSent || res.destroyed) return;
+      const safeMessage = ['23505', '23503', '23502', '23514', '22P02', '42703', '42P01', '42501'].includes(error.code)
+        ? (error.code === '23505' ? 'Record already exists' : error.code === '42501' ? 'Access denied' : 'Invalid request data')
+        : error.code && error.code !== 'P0001' ? 'Request failed' : error.message;
       send(
         {
           data: null,
           error: {
-            message: error.message,
+            message: safeMessage,
             code: error.code,
             status: error.status || 400,
           },
@@ -433,6 +467,8 @@ export async function startServer({
       );
     }
   });
+  server.maxRequestsPerSocket = 1000;
+  server.setTimeout(30000);
   try {
     await new Promise((ok, fail) => {
       server.once('error', fail);

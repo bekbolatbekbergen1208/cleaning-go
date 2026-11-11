@@ -1,6 +1,6 @@
 import { createServerClient, type CookieOptions } from '@cleaning-go/local-client';
 import { NextResponse, type NextRequest } from 'next/server';
-import { bodyIsTooLarge, clientIp, hasJsonContentType, isRateLimited, isSameOriginRequest, readJsonBody } from '../../../../lib/request-security';
+import { bodyIsTooLarge, clientIp, hasJsonContentType, isRateLimited, isSameOriginRequest, readJsonBody, sessionCookieOptions } from '../../../../lib/request-security';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
@@ -11,17 +11,17 @@ export async function POST(request: NextRequest) {
   if (!hasJsonContentType(request) || bodyIsTooLarge(request)) {
     return NextResponse.json({ error: 'Некорректный запрос' }, { status: 400 });
   }
-  if (isRateLimited(`login:${clientIp(request)}`, 10, 15 * 60 * 1000)) {
-    return NextResponse.json({ error: 'Слишком много попыток входа. Попробуйте через 15 минут.' }, { status: 429 });
-  }
   const body = await readJsonBody<{ email?: string; password?: string }>(request);
-  const email = body?.email?.trim().toLowerCase().slice(0, 254);
+  const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
   const password = body?.password;
 
-  if (!email || !password || password.length > 256) {
+  if (!email || email.length > 254 || typeof password !== 'string' || !password || password.length > 256) {
     return NextResponse.json({ error: 'Введите email и пароль' }, { status: 400 });
   }
 
+  if (isRateLimited(`login:${clientIp(request)}:${email}`, 30, 60_000)) {
+    return NextResponse.json({ error: 'Слишком много попыток входа. Попробуйте позже.' }, { status: 429 });
+  }
   const cookiesToSet: CookieToSet[] = [];
   const staleAuthCookieNames = request.cookies
     .getAll()
@@ -30,11 +30,11 @@ export async function POST(request: NextRequest) {
   const applyAuthCookies = (response: NextResponse) => {
     // Remove cookies left by previous sessions before applying the new token.
     staleAuthCookieNames.forEach((name) => response.cookies.set(name, '', { path: '/', maxAge: 0 }));
-    cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+    cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, { ...options, ...sessionCookieOptions(request.nextUrl.protocol === 'https:'), maxAge: options.maxAge }));
     return response;
   };
   const backend = createServerClient(
-    (process.env.NEXT_PUBLIC_LOCAL_API_URL || 'http://127.0.0.1:54321'),
+    (process.env.LOCAL_API_URL || 'http://127.0.0.1:54321'),
     '',
     {
       cookies: {

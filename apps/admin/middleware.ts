@@ -1,4 +1,5 @@
 import { createServerClient, type CookieOptions } from '@cleaning-go/local-client';
+import { sessionCookieOptions } from './lib/request-security';
 import { NextResponse, type NextRequest } from 'next/server';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
@@ -9,7 +10,8 @@ function secure(response: NextResponse) {
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-DNS-Prefetch-Control', 'off');
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set('Referrer-Policy', 'no-referrer');
+  response.headers.set('Cache-Control', 'no-store');
   response.headers.set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(self), payment=(), usb=(), browsing-topics=()');
   response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
   response.headers.set('Cross-Origin-Resource-Policy', 'same-origin');
@@ -18,14 +20,29 @@ function secure(response: NextResponse) {
 }
 
 export async function middleware(request: NextRequest) {
-  // Authentication endpoints manage their own session cookies.
-  if (['/api/auth/login', '/api/register'].includes(request.nextUrl.pathname)) return secure(NextResponse.next());
+  const nonce = btoa(crypto.randomUUID());
+  const csp = [
+    "default-src 'self'", `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
+    "style-src 'self' 'unsafe-inline'", "img-src 'self' data: blob: https://tile.openstreetmap.org",
+    "font-src 'self'", "connect-src 'self'", "object-src 'none'", "base-uri 'none'", "form-action 'self'", "frame-ancestors 'none'",
+  ].join('; ');
+  const headers = new Headers(request.headers);
+  headers.set('Content-Security-Policy', csp);
+  headers.set('x-nonce', nonce);
+  const response = await handleRequest(request, headers);
+  response.headers.set('Content-Security-Policy', request.nextUrl.pathname === '/api/local/file' ? "sandbox; default-src 'none'; frame-ancestors 'none'" : csp);
+  return secure(response);
+}
 
-  let response = NextResponse.next({ request });
+async function handleRequest(request: NextRequest, headers: Headers) {
+  // Authentication endpoints manage their own session cookies.
+  if (['/api/auth/login', '/api/register'].includes(request.nextUrl.pathname) || request.nextUrl.pathname.startsWith('/api/local/')) return NextResponse.next({ request: { headers } });
+
+  let response = NextResponse.next({ request: { headers } });
   const backend = createServerClient(
-    (process.env.NEXT_PUBLIC_LOCAL_API_URL || 'http://127.0.0.1:54321'),
+    (process.env.LOCAL_API_URL || 'http://127.0.0.1:54321'),
     '',
-    { cookies: { getAll: () => request.cookies.getAll(), setAll(items: CookieToSet[]) { items.forEach(({ name, value }) => request.cookies.set(name, value)); response = NextResponse.next({ request }); items.forEach(({ name, value, options }) => response.cookies.set(name, value, options)); } } },
+    { cookies: { getAll: () => request.cookies.getAll(), setAll(items: CookieToSet[]) { items.forEach(({ name, value }) => request.cookies.set(name, value)); response = NextResponse.next({ request: { headers } }); items.forEach(({ name, value, options }) => response.cookies.set(name, value, { ...options, ...sessionCookieOptions(request.nextUrl.protocol === 'https:'), maxAge: options.maxAge })); } } },
   );
   const { data: { user } } = await backend.auth.getUser();
   if (!user && request.nextUrl.pathname.startsWith('/api/orders/')) {

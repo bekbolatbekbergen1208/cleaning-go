@@ -16,12 +16,10 @@ export default function ResetPasswordPage() {
     const backend = createClient();
     void (async () => {
       const params = new URLSearchParams(window.location.search);
-      const hash = new URLSearchParams(window.location.hash.slice(1));
       const code = params.get('code');
       const tokenHash = params.get('token_hash');
       if (code) await backend.auth.exchangeCodeForSession(code);
       else if (tokenHash) await backend.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
-      else if (hash.get('access_token') && hash.get('refresh_token')) await backend.auth.setSession({ access_token: hash.get('access_token')!, refresh_token: hash.get('refresh_token')! });
       const { data: { user } } = await backend.auth.getUser();
       setReady(Boolean(user));
       if (!user) setError('Ссылка недействительна или срок её действия истёк. Запросите новую ссылку.');

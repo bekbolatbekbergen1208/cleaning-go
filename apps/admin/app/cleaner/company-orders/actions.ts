@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { createClient as createAdminClient } from '@cleaning-go/local-client';
 import { createClient } from '../../../lib/backend/server';
 
 export async function claimCompanyOrder(formData: FormData) {
@@ -19,40 +18,23 @@ export async function claimCompanyOrder(formData: FormData) {
   if (['астана', 'astana', 'нур-султан'].includes(order?.city?.trim().toLowerCase())) redirect(`/order/${orderId}/tracking`);
 }
 
-const nextStatuses: Record<string, string> = {
-  accepted: 'on_the_way',
-  on_the_way: 'arrived',
-  arrived: 'in_progress',
-  in_progress: 'completed_by_cleaner',
-};
-
 export async function advanceCompanyOrder(formData: FormData) {
   const orderId = String(formData.get('order_id') ?? '');
+  const expectedStatus = String(formData.get('expected_status') ?? '');
+  if (!['accepted', 'on_the_way', 'arrived', 'in_progress'].includes(expectedStatus)) throw new Error('Обновите страницу заказа.');
+  let completionPaths: unknown;
+  try { completionPaths = JSON.parse(String(formData.get('completion_photo_paths') ?? '[]')); }
+  catch { throw new Error('Некорректный фотоотчёт'); }
+  if (!Array.isArray(completionPaths) || completionPaths.length > 10 || completionPaths.some(path => typeof path !== 'string')) throw new Error('Некорректный фотоотчёт');
   const backend = await createClient();
-  const { data: { user } } = await backend.auth.getUser();
-  if (!user || !orderId) throw new Error('Заказ не найден');
-  const admin = createAdminClient((process.env.LOCAL_API_URL || 'http://127.0.0.1:54321'), process.env.LOCAL_SERVICE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data: worker } = await admin.from('order_workers').select('order_id').eq('order_id', orderId).eq('cleaner_id', user.id).maybeSingle();
-  if (!worker) throw new Error('Сначала возьмите этот заказ');
-  const { data: order } = await admin.from('orders').select('id,status,client_id,selected_company_id,photo_urls').eq('id', orderId).maybeSingle();
-  const nextStatus = order ? nextStatuses[order.status] : null;
-  if (!order || !nextStatus) throw new Error('Этап заказа уже изменён');
-  let completionPaths: string[] = [];
-  if (nextStatus === 'completed_by_cleaner') {
-    try { completionPaths = JSON.parse(String(formData.get('completion_photo_paths') ?? '[]')); } catch { completionPaths = []; }
-    completionPaths = completionPaths.filter(path => typeof path === 'string' && path.startsWith(`${user.id}/completion-${order.id}-`));
-    if (!completionPaths.length) throw new Error('Для завершения нужен фотоотчёт');
-  }
-  const update = nextStatus === 'completed_by_cleaner' ? { status: nextStatus, photo_urls: [...(order.photo_urls ?? []), ...completionPaths] } : { status: nextStatus };
-  const { error } = await admin.from('orders').update(update).eq('id', order.id).eq('status', order.status);
+  const { error } = await backend.rpc('advance_company_order', { target_order_id: orderId, completion_paths: completionPaths, expected_status: expectedStatus });
   if (error) throw new Error(error.message);
-  await admin.from('order_status_history').insert({ order_id: order.id, from_status: order.status, to_status: nextStatus, changed_by: user.id });
-  const labels: Record<string, string> = { on_the_way: 'Клинер выехал', arrived: 'Клинер прибыл', in_progress: 'Уборка началась', completed_by_cleaner: 'Клинер завершил уборку' };
-  const notifications = [{ user_id: order.client_id, order_id: order.id, type: 'order_status', title: labels[nextStatus], body: nextStatus === 'completed_by_cleaner' ? 'Подтвердите завершение в своём профиле' : 'Статус вашего заказа обновлён' }];
-  const { data: company } = await admin.from('company_profiles').select('owner_id').eq('id', order.selected_company_id).maybeSingle();
-  if (company) notifications.push({ user_id: company.owner_id, order_id: order.id, type: 'order_status', title: labels[nextStatus], body: 'Статус заказа обновлён клинером' });
-  await admin.from('notifications').insert(notifications);
   revalidatePath('/cleaner/company-orders');
   revalidatePath('/profile');
   revalidatePath('/company/orders');
+}
+
+export async function advanceCompanyOrderWithState(_previous: string, formData: FormData): Promise<string> {
+  try { await advanceCompanyOrder(formData); return ''; }
+  catch (error) { return error instanceof Error ? error.message : 'Не удалось изменить этап. Повторите попытку.'; }
 }

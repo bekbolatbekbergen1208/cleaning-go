@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import './globals.css';
 import 'leaflet/dist/leaflet.css';
 import type { Metadata, Viewport } from 'next';

@@ -108,7 +108,7 @@ export interface Client {
       access_token: string;
       refresh_token: string;
     }): Promise<Result>;
-    updateUser(args: { password: string }): Promise<Result>;
+    updateUser(args: { password: string; currentPassword?: string }): Promise<Result>;
     startAutoRefresh(): void;
     stopAutoRefresh(): void;
     admin: { createUser(user: any): Promise<Result<{ user: User }>> };

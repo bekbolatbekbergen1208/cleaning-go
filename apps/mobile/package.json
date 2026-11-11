@@ -32,7 +32,7 @@
     "react-native-screens": "~4.11.1",
     "react-native-web": "~0.20.0",
     "react-native-webview": "13.13.5",
-    "zod": "^3.25.76",
+    "zod": "4.6.6",
     "zustand": "^5.0.7",
     "@cleaning-go/local-client": "workspace:*",
     "expo-constants": "~17.1.8",

@@ -1,9 +1,10 @@
 import { randomBytes } from 'node:crypto';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, chmod } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
-await mkdir(resolve(root, '.local-data'), { recursive: true });
+await mkdir(resolve(root, '.local-data'), { recursive: true, mode: 0o700 });
+await chmod(resolve(root, '.local-data'), 0o700);
 const configPath = resolve(root, '.env.local');
 let config;
 try {
@@ -59,6 +60,7 @@ await writeFile(
   `${mobile}\nEXPO_PUBLIC_LOCAL_API_URL=http://127.0.0.1:54321\n`,
   { mode: 0o600 },
 );
+for (const path of [configPath, appPath, mobilePath]) await chmod(path, 0o600);
 console.log(
   'Local configuration ready. Start API: node --env-file=.env.local local/server.mjs',
 );

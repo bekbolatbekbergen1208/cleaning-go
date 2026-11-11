@@ -9,13 +9,15 @@ export async function confirmCompanyPrice(
   formData: FormData,
 ): Promise<string> {
   const orderId = String(formData.get('order_id') ?? '');
+  const quoteVersion = Number(formData.get('quote_version'));
+  if (!Number.isSafeInteger(quoteVersion) || quoteVersion < 1) return 'Обновите страницу и проверьте актуальную цену.';
   const backend = await createClient();
   const {
     data: { user },
   } = await backend.auth.getUser();
   if (!user || !orderId) return 'Заказ не найден. Обновите страницу.';
   const { error } = await backend.rpc('confirm_company_order_price', {
-    target_order_id: orderId,
+    target_order_id: orderId, expected_quote_version: quoteVersion,
   });
   if (error) return error.message;
   revalidatePath('/profile');
@@ -102,28 +104,11 @@ export async function cancelOrder(formData: FormData) {
     .maybeSingle();
   if (!order) throw new Error('Этот заказ уже нельзя отменить');
 
-  const cancelledAt = new Date().toISOString();
-  const { data: cancelled, error } = await admin
-    .from('orders')
-    .update({ status: 'cancelled', cancelled_at: cancelledAt })
-    .eq('id', order.id)
-    .eq('client_id', user.id)
-    .eq('status', order.status)
-    .select('id')
-    .maybeSingle();
+  const { error } = await backend.rpc('transition_order_status', {
+    target_order_id: order.id, next_status: 'cancelled', note: 'Клиент отменил заказ',
+  });
   if (error) throw new Error(error.message);
-  if (!cancelled)
-    throw new Error('Статус заказа уже изменился. Обновите страницу.');
 
-  await admin
-    .from('order_status_history')
-    .insert({
-      order_id: order.id,
-      from_status: order.status,
-      to_status: 'cancelled',
-      changed_by: user.id,
-      note: 'Клиент отменил заказ',
-    });
   if (order.selected_company_id) {
     const { data: company } = await admin
       .from('company_profiles')
