@@ -40,9 +40,11 @@ export default function Home() {
   useFocusEffect(useCallback(() => {
     if (demo) {
       setServices(demoServices);
-      setStats({ total: demoOrders.length, active: demoOrders.filter((order) => !['completed', 'cancelled'].includes(order.status)).length });
+      const activeDemoOrders = demoOrders.filter((order) => !['completed', 'cancelled'].includes(order.status)).length;
+      setStats({ total: demoOrders.length, active: activeDemoOrders });
       if (profile?.role === 'client') setClientCompany({ id: 'demo-company', name: 'Cleaning Go Demo', rating: 4.9, reviews_count: 128, cashback_bps: 500 });
-      if (profile?.role === 'company_owner') setReport({ ...emptyReport, clients: 24, orders_total: demoOrders.length, orders_active: stats.active, rating: 4.9, reviews_count: 128 });
+      // Use the fresh count: `stats` here is the value from the previous render.
+      if (profile?.role === 'company_owner') setReport({ ...emptyReport, clients: 24, orders_total: demoOrders.length, orders_active: activeDemoOrders, rating: 4.9, reviews_count: 128 });
       return;
     }
 

@@ -152,7 +152,10 @@ export async function startServer({
       res.end(JSON.stringify(value));
     };
     try {
-      if (limiter.hit(`request:${req.socket.remoteAddress}`, 1200, 60000)) throw tooMany();
+      // Every web user reaches the API through the co-located Next.js server, so a
+      // loopback address carries the whole site's traffic (each open tab polls
+      // ~20 times a minute). Keep the strict cap for direct remote clients only.
+      if (limiter.hit(`request:${req.socket.remoteAddress}`, isLoopback(req.socket.remoteAddress) ? 30000 : 1200, 60000)) throw tooMany();
       const url = new URL(req.url, 'http://localhost');
       if (url.pathname === '/health' && req.method === 'GET') {
         send({ ok: true, database: 'local-postgresql' });
@@ -359,7 +362,12 @@ export async function startServer({
       }
       if (body.action === 'recover') {
         if (typeof body.email !== 'string' || body.email.length > 254) throw httpError('Invalid email');
-        rate(`recovery:${req.socket.remoteAddress}`, 5);
+        // Per account, plus a generous per-address cap: web requests all share
+        // the Next.js server address, so a per-address limit of 5 blocked
+        // password recovery for the whole site.
+        // The address cap runs first so random e-mails cannot flood the counters.
+        rate(`recovery-all:${req.socket.remoteAddress}`, isLoopback(req.socket.remoteAddress) ? 300 : 20);
+        rate(`recovery:${req.socket.remoteAddress}:${body.email.trim().toLowerCase()}`, 5);
         const u = (
           await db.query(
             'select id,email from auth.users where lower(email)=$1',
@@ -397,7 +405,9 @@ export async function startServer({
       }
       if (body.action === 'verifyRecovery') {
         if (typeof body.token_hash !== 'string' || !/^[a-f0-9]{64}$/.test(body.token_hash)) throw httpError('Invalid or expired recovery link');
-        rate(`verify:${req.socket.remoteAddress}`);
+        // Recovery tokens are 256-bit random values, so guessing is infeasible;
+        // the cap only bounds load and must not block every web user at once.
+        rate(`verify:${req.socket.remoteAddress}`, isLoopback(req.socket.remoteAddress) ? 300 : 20);
         const u = await db.transaction(async (tx) => {
           const r = (
             await tx.query(
@@ -488,6 +498,11 @@ export async function startServer({
     },
   };
 }
+// The co-located Next.js server (and only processes on this machine) connect
+// from a loopback address; phones on the LAN keep their own addresses.
+export function isLoopback(address = '') {
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
+}
 function validatePath(bucket, path) {
   if (
     typeof bucket !== 'string' ||
@@ -502,10 +517,27 @@ if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
-  const app = await startServer();
+  let app;
+  try {
+    app = await startServer();
+  } catch (error) {
+    if (error instanceof WebAssembly.RuntimeError) {
+      console.error(
+        'The local database could not be opened; it was probably left open by a crash or a closed terminal.\n' +
+          'Recovery: keep a copy of .local-data/db, copy the folder to a new one, delete postmaster.pid in the copy\n' +
+          'and use the copy as .local-data/db. Keep .local-data outside folders synced by OneDrive/Dropbox.',
+      );
+    }
+    throw error;
+  }
   console.log(`Local API: http://127.0.0.1:${app.port}`);
-  for (const signal of ['SIGINT', 'SIGTERM'])
+  let stopping = false;
+  // SIGHUP: the terminal window was closed (Windows gives ~10 s); SIGBREAK:
+  // Ctrl+Break on Windows. Without these the database was never closed cleanly.
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK'])
     process.on(signal, async () => {
+      if (stopping) return;
+      stopping = true;
       await app.close();
       process.exit(0);
     });

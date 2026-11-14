@@ -98,6 +98,12 @@ try {
   check((await post('/api/register', { email: 'new@web.test', phone: '+77016660006', password, full_name: 'New client', role: 'client', referral_code: '' })).status, 201, 'client registration');
   check((await post('/api/register', { email: 'newowner@web.test', phone: '+77016660007', password, full_name: 'New owner', role: 'company_owner', referral_code: '   ', company_name: 'New company', company_registration_number: '223456789012', company_city: 'Актау', company_address: 'Дом 2', company_phone: '+77016660007' })).status, 201, 'company registration');
   check((await post('/api/register', { email: 'newcleaner@web.test', phone: '+77016660008', password, full_name: 'New cleaner', role: 'cleaner', referral_code: community.code })).status, 201, 'cleaner registration');
+  // Without a trusted proxy every visitor shares one rate-limit key: different
+  // people must still be able to register and recover passwords.
+  for (let i = 0; i < 8; i++) check((await post('/api/register', { email: `crowd${i}@web.test`, phone: `+7701667000${i}`, password, full_name: `Crowd ${i}`, role: 'client' })).status, 201, `registration #${i + 1} by a different person`);
+  for (let i = 0; i < 8; i++) check((await post('/api/local/api', { action: 'recover', email: `crowd${i}@web.test`, redirectTo: `${base}/reset-password` })).status, 200, `password recovery #${i + 1} by a different person`);
+  for (let i = 0; i < 5; i++) await post('/api/local/api', { action: 'recover', email: 'same@web.test', redirectTo: `${base}/reset-password` });
+  check((await post('/api/local/api', { action: 'recover', email: 'same@web.test', redirectTo: `${base}/reset-password` })).status, 429, 'password recovery still limited per account');
   const logout = await post('/api/local/api', { action: 'signOut' }, adminCookie); check(logout.status, 200, 'logout');
   check((await post('/api/local/api', { action: 'getUser' }, adminCookie).then(r => r.json())).data.user, null, 'logout invalidates server session');
   check((await fetch(base + '/.env.local', { redirect: 'manual' })).status === 200, false, 'environment file inaccessible');

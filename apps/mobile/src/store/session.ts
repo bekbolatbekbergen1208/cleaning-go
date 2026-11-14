@@ -1,5 +1,4 @@
-import type { Profile } from '@cleaning-go/types';
-import type { Order, OrderStatus } from '@cleaning-go/types';
+import type { Order, OrderStatus, Profile } from '@cleaning-go/types';
 import type { Session } from '@cleaning-go/local-client';
 import { create } from 'zustand';
 

@@ -22,7 +22,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!body || typeof body.action !== 'string' || !actions.has(body.action)) return fail('Invalid request', 400);
     action = body.action;
     if (!token && !anonymousActions.has(action)) return fail('Sign in required', 401);
-    if (['signIn', 'recover', 'verifyRecovery'].includes(action) && isRateLimited(`proxy-auth:${clientIp(request)}:${action}:${action === 'signIn' && typeof body.email === 'string' ? body.email.toLowerCase().slice(0,254) : ''}`, action === 'recover' ? 5 : 30, 900000)) return fail('Too many attempts. Try again later.', 429);
+    if (['signIn', 'recover', 'verifyRecovery'].includes(action)) {
+      // Without a trusted proxy clientIp() is one shared value for every visitor,
+      // so limits are per account with a generous site-wide cap; a bare
+      // "5 per address" limit blocked password recovery for everyone.
+      const ip = clientIp(request);
+      const email = typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 254) : '';
+      const limited = action === 'verifyRecovery'
+        ? isRateLimited(`proxy-auth:${ip}:verifyRecovery`, 300, 900000)
+        : (action === 'recover' && isRateLimited(`proxy-auth:${ip}:recover-all`, 300, 900000))
+          || isRateLimited(`proxy-auth:${ip}:${action}:${email}`, action === 'recover' ? 5 : 30, 900000);
+      if (limited) return fail('Слишком много попыток. Попробуйте позже.', 429);
+    }
     headers.set('Content-Type', 'application/json');
     payload = JSON.stringify(body);
   } else {

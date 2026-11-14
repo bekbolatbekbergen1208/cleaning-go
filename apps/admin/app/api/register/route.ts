@@ -47,7 +47,12 @@ export async function POST(request: NextRequest) {
       { error: 'Некорректный запрос.' },
       { status: 400, headers },
     );
-  if (isRateLimited(`register:${clientIp(request)}`, 5, 60 * 60 * 1000)) {
+  // Behind a trusted proxy clientIp() is the visitor's address: 5 per hour each.
+  // In local mode it is one shared value for every visitor, so a limit of 5
+  // blocked registration for the whole platform; use a site-wide cap instead
+  // (plus a per-email limit below).
+  const ip = clientIp(request);
+  if (isRateLimited(`register:${ip}`, ip === 'local' ? 100 : 5, 60 * 60 * 1000)) {
     return NextResponse.json(
       { error: 'Слишком много регистраций. Попробуйте позже.' },
       { status: 429, headers },
@@ -88,6 +93,11 @@ export async function POST(request: NextRequest) {
         { status: 400, headers },
       );
     }
+    if (isRateLimited(`register-email:${email}`, 5, 60 * 60 * 1000))
+      return NextResponse.json(
+        { error: 'Слишком много регистраций. Попробуйте позже.' },
+        { status: 429, headers },
+      );
     const referralCode = typeof body.referral_code === 'string'
       ? body.referral_code.trim().toUpperCase()
       : '';
