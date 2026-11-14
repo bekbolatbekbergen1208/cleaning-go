@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { lockDatabase } from './lock.mjs';
 
 export async function openDatabase(
-  path = process.env.LOCAL_DATA_DIR || './.local-data/db',
+  path = process.env.LOCAL_DATA_DIR || resolve(process.env.LOCAL_DATA_ROOT || './.local-data', 'db'),
 ) {
   if (path !== ':memory:') await mkdir(resolve(path), { recursive: true });
   const release =

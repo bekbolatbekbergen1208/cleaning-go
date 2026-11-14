@@ -4,10 +4,11 @@ type Attempt = { count: number; resetAt: number };
 const buckets = new Map<string, Attempt>();
 
 export function clientIp(request: NextRequest) {
-  // Forwarding headers are attacker-controlled unless a trusted reverse proxy
-  // overwrites them. Local mode deliberately uses a shared conservative bucket.
+  // Nginx overwrites X-Real-IP with the actual TCP peer. X-Forwarded-For can
+  // contain a client-supplied prefix, so never use it for rate-limit keys.
+  // Local mode deliberately uses a shared conservative bucket.
   return process.env.TRUST_PROXY_HEADERS === 'true'
-    ? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim().slice(0, 64) || 'unknown'
+    ? request.headers.get('x-real-ip')?.trim().slice(0, 64) || 'unknown'
     : 'local';
 }
 

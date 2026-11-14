@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { applyRestrictedCompanyBonus, assertReferralIsAllowed, calculateCompanyPromoBonus, calculateMoney, canCreateReview, canTransitionOrder, shouldFinalizeOrder } from './index';
+import { applyRestrictedCompanyBonus, assertReferralIsAllowed, calculateCompanyPromoBonus, calculateMoney, canCreateReview, canTransitionOrder, orderDraftSchema, shouldFinalizeOrder } from './index';
+
+it('accepts seeded PostgreSQL service and option identifiers in an order', () => {
+  const result = orderDraftSchema.safeParse({
+    serviceId: '10000000-0000-0000-0000-000000000001',
+    addressId: '123e4567-e89b-42d3-a456-426614174000',
+    scheduledAt: new Date(Date.now() + 86400000).toISOString(),
+    areaSqM: 50,
+    roomsCount: 2,
+    executorPreference: 'company',
+    paymentMethod: 'cash',
+    optionIds: ['10000000-0000-0000-0000-000000000001'],
+  });
+  expect(result.success).toBe(true);
+});
 
 describe('calculateMoney', () => {
   it('calculates the documented 20 000 KZT example in tiyn', () => {

@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 const publicPaths = new Set(['/', '/register', '/login', '/admin/login', '/api/register', '/api/auth/login', '/reset-password']);
-const adminPaths = ['/admin', '/orders', '/verifications', '/users', '/services', '/moderation', '/settings'];
+const adminPaths = ['/admin', '/orders', '/verifications', '/users', '/services', '/moderation', '/settings', '/companies', '/communities'];
 
 function secure(response: NextResponse) {
   response.headers.set('X-Content-Type-Options', 'nosniff');
@@ -51,8 +51,14 @@ async function handleRequest(request: NextRequest, headers: Headers) {
     return secure(unauthorized);
   }
   if (!user && !publicPaths.has(request.nextUrl.pathname) && !request.nextUrl.pathname.startsWith('/r/')) {
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Сначала войдите в аккаунт' }, { status: 401 });
+    }
     const isAdminPath = adminPaths.some((path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(`${path}/`));
-    const redirectResponse = NextResponse.redirect(new URL(isAdminPath ? '/admin/login' : '/login', request.url));
+    // Behind a reverse proxy Next may see its loopback address as request.url.
+    // PUBLIC_APP_URL pins browser redirects to the public site in production.
+    const origin = process.env.PUBLIC_APP_URL || request.url;
+    const redirectResponse = NextResponse.redirect(new URL(isAdminPath ? '/admin/login' : '/login', origin));
     response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));
     return secure(redirectResponse);
   }

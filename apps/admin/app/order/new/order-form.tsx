@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- object URLs preview the selected local photo */
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../../../components/icon';
 import { AddressPicker } from '../../../components/maps/address-picker';
 import type { MapPoint } from '../../../components/maps/astana-map';
@@ -61,6 +61,7 @@ export function OrderForm({
   ].sort((a, b) => a.localeCompare(b, 'ru'));
   const [mapPoint, setMapPoint] = useState<MapPoint | null>(null);
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
@@ -114,6 +115,9 @@ export function OrderForm({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting.current) return;
+    submitting.current = true;
+    let completed = false;
     const formElement = event.currentTarget;
     setBusy(true);
     setError('');
@@ -228,16 +232,18 @@ export function OrderForm({
           ? `Заказ ${order.order_number} отправлен клинеру.`
           : `Заказ ${order.order_number} создан. Компания скоро подтвердит цену.`,
       );
-      setBusy(false);
-      formElement.reset();
-      setMapPoint(null);
-      setPhoto(null);
-      setBonusKzt(0);
+      router.push('/profile/orders');
+      completed = true;
     } catch {
       setError(
         'Не удалось отправить заказ. Проверьте соединение и попробуйте снова.',
       );
-      setBusy(false);
+    } finally {
+      // Keep the form locked after a successful create until navigation unmounts it.
+      if (!completed) {
+        submitting.current = false;
+        setBusy(false);
+      }
     }
   }
 

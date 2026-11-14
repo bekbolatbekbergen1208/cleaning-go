@@ -343,6 +343,10 @@ try {
     }
     assert.ok(ready, 'Web server start');
   }
+  if (!live) {
+    const home = await fetch(base + '/').then((response) => response.text());
+    check(home.includes('Заказы пока недоступны'), 'empty marketplace is disclosed on home page');
+  }
   const admin = await login(
     adminUser.email,
     live ? process.env.SEED_ADMIN_PASSWORD : password,
@@ -376,6 +380,10 @@ try {
     await db.from('company_profiles').select('*').eq('id', company.id).single(),
   );
   check(company.verification_status === 'approved', 'company approval saved');
+  if (!live) {
+    const home = await fetch(base + '/').then((response) => response.text());
+    check(!home.includes('Заказы пока недоступны'), 'booking notice disappears after company approval');
+  }
   await submitForm(
     admin,
     '/communities',

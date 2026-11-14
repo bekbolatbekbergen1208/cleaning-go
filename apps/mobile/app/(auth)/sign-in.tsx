@@ -88,26 +88,35 @@ export default function SignIn() {
       setFeedback({
         kind: 'error',
         title: 'Введите email',
-        body: 'Укажите email, на который отправить ссылку восстановления.',
+        body: 'Укажите email вашего аккаунта.',
       });
       return;
     }
-    const { error } = await backend.auth.resetPasswordForEmail(
-      email.trim().toLowerCase(),
-      {
-        redirectTo:
-          Platform.OS === 'web' ? undefined : 'cleaninggo://reset-password',
-      },
-    );
-    const next = error
-      ? { kind: 'error' as const, title: 'Ошибка', body: error.message }
-      : {
-          kind: 'success' as const,
-          title: 'Письмо отправлено',
-          body: 'Проверьте почту и перейдите по ссылке восстановления.',
-        };
-    setFeedback(next);
-    if (error) Alert.alert(next.title, next.body);
+    setBusy(true);
+    try {
+      const { error } = await backend.auth.resetPasswordForEmail(
+        email.trim().toLowerCase(),
+        {
+          redirectTo:
+            Platform.OS === 'web' ? undefined : 'cleaninggo://reset-password',
+        },
+      );
+      const next = error
+        ? { kind: 'error' as const, title: 'Ошибка', body: error.message }
+        : {
+            kind: 'success' as const,
+            title: 'Запрос принят',
+            body: 'Автоматическая отправка писем пока не подключена. Для получения ссылки обратитесь к администратору сервиса.',
+          };
+      setFeedback(next);
+      if (error) Alert.alert(next.title, next.body);
+    } catch {
+      const next = { kind: 'error' as const, title: 'Нет соединения', body: 'Не удалось запросить восстановление. Попробуйте позже.' };
+      setFeedback(next);
+      Alert.alert(next.title, next.body);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

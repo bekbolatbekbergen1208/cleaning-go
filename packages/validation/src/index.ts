@@ -19,7 +19,7 @@ export const registrationSchema = z
   });
 
 export const orderDraftSchema = z.object({
-  serviceId: z.string().uuid(),
+  serviceId: z.string().guid(),
   addressId: z.string().uuid(),
   scheduledAt: z.string().datetime().refine((v) => new Date(v) > new Date(), 'Выберите будущее время'),
   areaSqM: z.coerce.number().int().min(1).max(10_000),
@@ -29,7 +29,7 @@ export const orderDraftSchema = z.object({
   selectedCleanerId: z.string().uuid().optional(),
   selectedCompanyId: z.string().uuid().optional(),
   paymentMethod: z.enum(['cash', 'card', 'test']),
-  optionIds: z.array(z.string().uuid()),
+  optionIds: z.array(z.string().guid()),
 });
 
 export const reviewSchema = z.object({

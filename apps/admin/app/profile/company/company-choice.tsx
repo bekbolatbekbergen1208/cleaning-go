@@ -43,7 +43,7 @@ export function CompanyChoice({ companies, preferredCompanyId, locked, initialCi
       <datalist id="company-cities">{cities.map(value => <option key={value} value={value} />)}</datalist>
     </label>}
     {!locked && !city.trim() && <p className="card">Укажите город, чтобы увидеть доступные клининговые компании.</p>}
-    {!visibleCompanies.length && (city.trim() || locked) && <p className="card">{locked ? 'Закреплённая компания сейчас недоступна. Обратитесь в поддержку.' : 'В этом городе пока нет проверенных компаний. Можно выбрать другой город.'}</p>}
+    {!visibleCompanies.length && (city.trim() || locked) && <p className="card">{locked ? 'Закреплённая компания сейчас недоступна. Обратитесь в поддержку.' : companies.length === 0 ? 'Заказ пока недоступен: в сервисе ещё нет проверенных компаний. Вернитесь позже.' : 'В этом городе пока нет проверенных компаний. Можно выбрать другой город.'}</p>}
     <div className="grid gap-3 sm:grid-cols-2">{visibleCompanies.map(company => <button key={company.id} type="button" disabled={locked || busy} aria-pressed={selected === company.id} onClick={() => setSelected(company.id)} className={`rounded-2xl border-2 p-5 text-left ${selected === company.id ? 'border-emerald-600 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
       <b className="text-lg">{company.name}</b>
       <p className="mt-1 text-sm text-slate-600">{company.service_cities.join(', ') || 'Город не указан'}</p>
