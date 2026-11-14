@@ -57,8 +57,8 @@ try {
   for (const path of ['/admin', '/users', '/orders', '/company', '/profile', '/cleaner/my-work']) check((await fetch(base + path, { redirect: 'manual' })).status, 307, `anonymous ${path}`);
   let adminCookie = '';
   for (const [role, paths] of [
-    ['admin', ['/admin', '/users', '/orders', '/companies', '/communities', '/services', '/settings', '/moderation', '/verifications', '/notifications']],
-    ['owner', ['/company', '/company/orders', '/company/employees', '/company/sales', '/company/reports', '/company/cities', '/company/tracking', '/notifications']],
+    ['admin', ['/admin', '/admin/reports', '/admin/reports?period=all', '/users', '/orders', '/companies', '/communities', '/services', '/settings', '/moderation', '/verifications', '/notifications']],
+    ['owner', ['/company', '/company/orders', '/company/employees', '/company/sales', '/company/reports', '/company/reports?period=7', '/company/reports?period=all', '/company/cities', '/company/tracking', '/notifications']],
     ['client', ['/profile', '/profile/orders', '/profile/company', '/order/new', '/notifications']],
     ['cleaner', ['/profile', '/cleaner/direct-orders', '/cleaner/company-orders', '/cleaner/my-work', '/notifications']],
   ]) {
@@ -88,6 +88,15 @@ try {
       assert.equal(order.error, null, JSON.stringify(order)); checks++;
       const cancelled = await post('/api/local/api', { action: 'rpc', name: 'transition_order_status', args: { target_order_id: order.data.id, next_status: 'cancelled' } }, auth).then(r => r.json());
       check(cancelled.data?.status, 'cancelled', 'client order cancellation through proxy');
+    }
+    // CSV exports: admin sees the platform, an owner only its company, nobody else.
+    // Runs before the /admin probe below, which signs a non-admin out.
+    const csv = (scope) => fetch(`${base}/api/reports/orders?scope=${scope}&period=all`, { headers: { cookie: auth }, redirect: 'manual' });
+    check((await csv('admin')).status, role === 'admin' ? 200 : 403, `${role} admin CSV`);
+    check((await csv('company')).status, role === 'owner' ? 200 : 403, `${role} company CSV`);
+    if (role === 'owner') {
+      const response = await csv('company'); const text = await response.text();
+      assert.ok(response.headers.get('content-type')?.startsWith('text/csv') && text.includes('Номер;Создан') && !text.includes('Исполнитель'), 'company CSV header'); checks++;
     }
     if (role !== 'admin') check((await fetch(base + '/admin', { headers: { cookie: auth }, redirect: 'manual' })).status, 307, `${role} denied admin`);
   }

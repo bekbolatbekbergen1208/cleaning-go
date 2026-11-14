@@ -1700,3 +1700,323 @@ input[type='file']::file-selector-button {
     line-height: 40px;
   }
 }
+
+/* ---- Reports (company and admin) ---- */
+.report-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+}
+.report-periods {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #e1e9e3;
+  border-radius: 14px;
+  background: #fff;
+}
+.report-periods a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  color: #4b5d52;
+  font-size: 14px;
+  font-weight: 700;
+}
+.report-periods a[aria-current='page'] {
+  background: #087562;
+  color: #fff;
+}
+.report-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid #087562;
+  border-radius: 12px;
+  color: #087562;
+  font-weight: 700;
+  font-size: 14px;
+}
+.report-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+.report-metric {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #e1e9e3;
+  border-radius: 16px;
+  background: #fff;
+}
+.report-metric p {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+}
+.report-metric b {
+  display: block;
+  margin-top: 6px;
+  color: #153d30;
+  font-size: 24px;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+.report-metric small {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+}
+.report-card,
+.report-chart {
+  min-width: 0;
+  margin: 0;
+  padding: 18px;
+  border: 1px solid #e1e9e3;
+  border-radius: 18px;
+  background: #fff;
+}
+.report-card h2 {
+  margin-bottom: 12px;
+  font-size: 18px;
+  font-weight: 850;
+}
+.report-chart figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 800;
+}
+.report-chart figcaption b {
+  color: #087562;
+}
+.report-plot {
+  position: relative;
+  height: 200px;
+  margin-top: 18px;
+  margin-left: 64px;
+}
+.report-grid > div {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid #edf1ee;
+}
+.report-grid span {
+  position: absolute;
+  right: calc(100% + 8px);
+  transform: translateY(-50%);
+  color: #6b7c72;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.report-bars {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+.report-bars li {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  align-items: flex-end;
+  height: 100%;
+  min-width: 0;
+  outline: none;
+  cursor: default;
+}
+.report-bars i {
+  display: block;
+  width: 100%;
+  max-width: 36px;
+  margin: 0 auto;
+  border-radius: 4px 4px 0 0;
+  background: #087562;
+}
+.report-bars li:hover i,
+.report-bars li:focus-visible i {
+  background: #054d41;
+}
+.report-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  z-index: 5;
+  display: none;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #153d30;
+  color: #fff;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.report-tip b {
+  display: block;
+  font-size: 13px;
+}
+.report-bars li:hover .report-tip,
+.report-bars li:focus-visible .report-tip {
+  display: block;
+}
+.report-bars li:hover {
+  background: #0875620d;
+}
+.report-x {
+  display: flex;
+  gap: 2px;
+  margin-left: 64px;
+  margin-top: 6px;
+}
+.report-x span {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: visible;
+  color: #6b7c72;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.report-breakdown {
+  display: grid;
+  gap: 12px;
+}
+.report-breakdown div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+.report-breakdown small {
+  color: #64748b;
+  font-weight: 500;
+}
+.report-breakdown i {
+  display: block;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 0 4px 4px 0;
+  background: #087562;
+}
+.report-empty {
+  margin-top: 12px;
+  color: #64748b;
+  font-size: 14px;
+}
+.report-table {
+  width: 100%;
+  font-size: 14px;
+  border-collapse: collapse;
+}
+.report-table th {
+  padding: 8px 10px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  white-space: nowrap;
+}
+.report-table td {
+  padding: 10px;
+  border-top: 1px solid #edf1ee;
+}
+.report-table td.num,
+.report-table th.num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.report-grid-2 {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+@media (min-width: 900px) {
+  .report-grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 767px) {
+  .report-plot,
+  .report-x {
+    margin-left: 52px;
+  }
+  .report-plot {
+    height: 170px;
+  }
+  .report-metric b {
+    font-size: 20px;
+  }
+  .report-toolbar {
+    align-items: stretch;
+  }
+  .report-periods {
+    width: 100%;
+  }
+  .report-periods a {
+    flex: 1 1 0;
+    justify-content: center;
+    padding: 0 6px;
+    font-size: 13px;
+  }
+  .report-download {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ---- Log out (cabinet headers and logged-in public header) ---- */
+.header-logout {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid #e1e9e3;
+  border-radius: 10px;
+  background: #fff;
+  color: #b42318;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.header-logout:hover:not(:disabled) {
+  border-color: #f3b4ae;
+  background: #fef3f2;
+}
+.cabinet-logout {
+  grid-column: 1 / -1;
+  min-height: 48px;
+  border: 1px solid #f3d3cf;
+  border-radius: 12px;
+  background: #fef3f2;
+  color: #b42318;
+  font-size: 14px;
+  font-weight: 750;
+}
+.header-logout:disabled,
+.cabinet-logout:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+/* Report tables fit their card: overrides the phone rule that gives every
+   table in .site-main a 640px minimum width. */
+.site-main table.report-table {
+  min-width: 0;
+}
+.report-section {
+  margin-top: 16px;
+}

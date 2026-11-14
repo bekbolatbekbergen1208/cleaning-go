@@ -8,6 +8,7 @@ import { createClient } from '../lib/backend/client';
 
 const adminLinks = [
   ['/admin', 'Обзор'],
+  ['/admin/reports', 'Отчёты'],
   ['/verifications', 'Проверки'],
   ['/orders', 'Заказы'],
   ['/users', 'Люди'],
@@ -30,6 +31,7 @@ export function SiteHeader() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
   useEffect(() => {
     const auth = createClient().auth;
     let active = true;
@@ -57,7 +59,21 @@ export function SiteHeader() {
   useEffect(() => setMenuOpen(false), [pathname]);
   const active = (href: string) =>
     pathname === href ||
-    (href !== '/' && href !== '/company' && pathname.startsWith(`${href}/`));
+    (href !== '/' && href !== '/company' && href !== '/admin' && pathname.startsWith(`${href}/`));
+  async function logout() {
+    setLoggingOut(true);
+    try {
+      await createClient().auth.signOut();
+    } finally {
+      // A full reload drops every page that was rendered for the old session.
+      window.location.assign(isAdmin ? '/admin/login' : '/login');
+    }
+  }
+  const logoutButton = (className: string) => (
+    <button type="button" className={className} onClick={() => void logout()} disabled={loggingOut}>
+      {loggingOut ? 'Выходим…' : 'Выйти'}
+    </button>
+  );
   const tabs: {
     href: string;
     label: string;
@@ -112,6 +128,7 @@ export function SiteHeader() {
                     {label}
                   </Link>
                 ))}
+                {logoutButton('header-logout')}
               </nav>
               <button
                 className="mobile-menu-button"
@@ -134,6 +151,7 @@ export function SiteHeader() {
                 <a href="/#how">Как это работает</a>
                 <Link href="/profile">Профиль</Link>
                 {loggedIn === false && <Link href="/login">Войти</Link>}
+                {loggedIn === true && logoutButton('header-logout')}
                 <Link href="/order/new" className="header-order-button">
                   Заказать уборку <Icon name="arrow" width="18" height="18" />
                 </Link>
@@ -171,6 +189,7 @@ export function SiteHeader() {
                 <Icon name="arrow" width="18" height="18" />
               </Link>
             ))}
+            {logoutButton('cabinet-logout')}
           </nav>
         )}
       </header>
