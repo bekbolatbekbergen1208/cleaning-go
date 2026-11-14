@@ -21,7 +21,7 @@ test('local backend: migrations, auth, RLS, catalog, relations, files, recovery 
     assert.equal(
       (await app.db.query('select count(*) from local_migrations')).rows[0]
         .count,
-      41,
+      42,
     );
     let r = await anon.from('cleaning_services').select('*');
     assert.equal(r.error, null);

@@ -210,7 +210,7 @@ export async function callFunction(tx, name, args = {}) {
   if (!fn) throw new Error('Unknown function');
   // Expose business operations only, never trigger/internal security helpers.
   if (
-    !/^(advance_company_order|update_published_company_order|propose_company_order_price|confirm_company_order_price|accept_order|apply_company_promo_code|apply_invitation_code|choose_company|claim_company_order|create_order|create_order_with_bonus|create_review|decide_company_membership|get_my_company_report|join_cleaner_community|join_company_community|preview_invitation_code|open_dispute|set_cleaner_workday|set_company_order_price|set_my_company_cashback|set_my_company_welcome_bonus|transition_order_status|update_cleaner_location)$/.test(
+    !/^(advance_company_order|update_published_company_order|propose_company_order_price|confirm_company_order_price|accept_order|apply_company_promo_code|apply_invitation_code|choose_company|claim_company_order|create_order|create_order_with_bonus|create_order_review|create_review|decide_company_membership|get_my_company_report|join_cleaner_community|join_company_community|preview_invitation_code|open_dispute|set_cleaner_workday|set_company_order_price|set_my_company_cashback|set_my_company_welcome_bonus|transition_order_status|update_cleaner_location)$/.test(
       name,
     )
   )

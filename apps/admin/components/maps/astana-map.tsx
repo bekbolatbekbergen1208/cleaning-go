@@ -49,6 +49,10 @@ export function AstanaMap({
             'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           {
             maxZoom: 19,
+            // The site sends no Referer (no-referrer), but OSM's tile policy
+            // requires one and answers some requests with an "Access blocked"
+            // tile. Tiles alone send the bare origin, never the page URL.
+            referrerPolicy: 'strict-origin-when-cross-origin',
             attribution:
               '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>',
           },

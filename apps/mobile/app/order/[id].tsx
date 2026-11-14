@@ -1,4 +1,4 @@
-import { TwoGisMap } from '@/components/two-gis-map';
+import { TwoGisMap, hasTwoGisKey } from '@/components/two-gis-map';
 import {
   Button,
   Card,
@@ -276,7 +276,7 @@ export default function OrderDetail() {
       {trackingStatuses.includes(order.status) && points.length ? (
         points.map((point) => (
           <Card key={point.cleaner_id}>
-            <Text style={s.cardTitle}>Клинер на карте 2GIS</Text>
+            <Text style={s.cardTitle}>{hasTwoGisKey() ? 'Клинер на карте 2GIS' : 'Клинер на карте'}</Text>
             <TwoGisMap latitude={point.latitude} longitude={point.longitude} />
             <Text style={s.muted}>
               Обновлено{' '}

@@ -100,7 +100,7 @@ export default async function ProfilePage() {
   );
   const isCleaner =
     profile?.role === 'cleaner' || profile?.role === 'company_cleaner';
-  const { data: cleanerAvailability } = isCleaner ? await backend.from('cleaner_profiles').select('is_available,workday_ends_at').eq('user_id', user.id).maybeSingle() : { data: null };
+  const { data: cleanerAvailability } = isCleaner ? await backend.from('cleaner_profiles').select('is_available,workday_ends_at,rating,reviews_count').eq('user_id', user.id).maybeSingle() : { data: null };
   const { data: membership, error: membershipError } = isCleaner
     ? await backend
         .from('community_cleaners')
@@ -223,6 +223,7 @@ export default async function ProfilePage() {
             </Link>
           </div>
         )}
+        {isCleaner && <p className="mt-4 rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-900">Ваш рейтинг: {Number(cleanerAvailability?.reviews_count ?? 0) ? `★ ${Number(cleanerAvailability?.rating).toFixed(1)} · ${cleanerAvailability?.reviews_count} оценок` : 'пока нет оценок'}</p>}
         {isCleaner && <WorkdayToggle active={Boolean(cleanerAvailability?.is_available && cleanerAvailability.workday_ends_at && Date.parse(cleanerAvailability.workday_ends_at) > Date.now())} endsAt={cleanerAvailability?.workday_ends_at ?? null} />}
         {isCleaner && (
           <section className="mt-6 rounded-xl bg-emerald-50 p-4">

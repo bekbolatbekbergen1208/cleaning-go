@@ -21,7 +21,7 @@ export default async function CompanyCleanersPage() {
   if (membershipError) throw new Error('Не удалось загрузить сообщество');
   const community = membership?.cleaner_communities as unknown as { name: string; code: string; is_active: boolean } | null;
   let members: Member[] = [];
-  let cleaners: { user_id: string; verification_status: string; is_available: boolean }[] = [];
+  let cleaners: { user_id: string; verification_status: string; is_available: boolean; rating: number; reviews_count: number }[] = [];
   if (membership) {
     const { data, error } = await admin.from('community_cleaners')
       .select('cleaner_id,profiles!cleaner_id(full_name,status)').eq('community_id', membership.community_id).order('joined_at');
@@ -29,7 +29,7 @@ export default async function CompanyCleanersPage() {
     members = (data ?? []) as unknown as Member[];
     if (members.length) {
       const { data: details, error: detailsError } = await admin.from('cleaner_profiles')
-        .select('user_id,verification_status,is_available').in('user_id', members.map(member => member.cleaner_id));
+        .select('user_id,verification_status,is_available,rating,reviews_count').in('user_id', members.map(member => member.cleaner_id));
       if (detailsError) throw new Error('Не удалось загрузить статусы клинеров');
       cleaners = details ?? [];
     }
@@ -49,7 +49,7 @@ export default async function CompanyCleanersPage() {
         const cleaner = byId.get(member.cleaner_id);
         const available = community.is_active && member.profiles?.status === 'active' && cleaner?.verification_status === 'approved' && cleaner.is_available;
         return <article className="card flex items-center justify-between gap-4" key={member.cleaner_id}>
-          <h2 className="font-bold">{member.profiles?.full_name ?? 'Клинер'}</h2>
+          <div><h2 className="font-bold">{member.profiles?.full_name ?? 'Клинер'}</h2><p className="mt-1 text-sm font-semibold text-amber-700">{Number(cleaner?.reviews_count) ? `★ ${Number(cleaner?.rating).toFixed(1)} · ${cleaner?.reviews_count} оценок` : 'Оценок пока нет'}</p></div>
           <span className={`rounded-full px-3 py-1 text-xs font-bold ${available ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{available ? 'Доступен' : 'Недоступен'}</span>
         </article>;
       }) : <p className="card text-slate-500">Клинеров пока нет. Передайте клинеру код сообщества для регистрации.</p>}</div>
