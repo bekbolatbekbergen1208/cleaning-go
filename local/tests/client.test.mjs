@@ -114,3 +114,21 @@ test('network timeout aborts login so a late response cannot unexpectedly sign i
     global.fetch = original;
   }
 });
+test('request timeout also covers a stalled response body', async () => {
+  const original = global.fetch;
+  global.fetch = async (_url, { signal }) => ({
+    json: () => new Promise((_ok, fail) =>
+      signal.addEventListener('abort', () =>
+        fail(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+      ),
+    ),
+  });
+  try {
+    const client = createClient('http://test.invalid', '', { requestTimeoutMs: 20 });
+    const result = await client.auth.getUser();
+    assert.equal(result.error.status, 0);
+    assert.match(result.error.message, /не ответил вовремя/);
+  } finally {
+    global.fetch = original;
+  }
+});

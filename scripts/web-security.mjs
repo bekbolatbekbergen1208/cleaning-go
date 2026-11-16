@@ -32,7 +32,7 @@ try {
   }
   child = spawn(process.execPath, [require.resolve('next/dist/bin/next'), 'start', '--hostname', '127.0.0.1', '--port', '3107'], {
     cwd: fileURLToPath(new URL('../apps/admin/', import.meta.url)),
-    env: { ...process.env, NODE_ENV: 'production', LOCAL_API_URL: `http://127.0.0.1:${app.port}`, LOCAL_SERVICE_KEY: key, PUBLIC_APP_URL: base, SEED_ADMIN_EMAIL: 'admin@web.test' }, stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, NODE_ENV: 'production', LOCAL_API_URL: `http://127.0.0.1:${app.port}`, LOCAL_SERVICE_KEY: key, PUBLIC_APP_URL: base, SEED_ADMIN_EMAIL: 'admin@web.test', TRUST_PROXY_HEADERS: 'true' }, stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logs = ''; child.stdout.on('data', x => { logs += x; }); child.stderr.on('data', x => { logs += x; });
   for (let n = 0; n < 100; n++) {
@@ -43,6 +43,18 @@ try {
   for (const path of ['/', '/login', '/register', '/admin/login', '/reset-password', '/manifest.webmanifest', '/icon-192.png', '/apple-icon.png']) {
     const r = await fetch(base + path); check(r.status, 200, `public ${path}`);
   }
+  check((await fetch(base + '/api/register', { method: 'OPTIONS', headers: { origin: base } })).status, 204, 'registration CORS preflight');
+  check((await fetch(base + '/api/register', { method: 'OPTIONS', headers: { origin: 'https://evil.example' } })).status, 403, 'registration CORS rejects other origins');
+  check((await fetch(base + '/api/local/api')).status, 404, 'proxy rejects GET on JSON endpoint');
+  check((await post('/api/local/unknown', { action: 'getUser' })).status, 404, 'proxy rejects unknown endpoint');
+  check((await post('/api/local/api', { action: 'getUser' }, '', { 'content-type': 'text/plain' })).status, 415, 'proxy requires JSON content type');
+  check((await post('/api/local/api', '{}')).status, 400, 'proxy rejects missing action');
+  check((await post('/api/local/api', { action: 'query', plan: {} })).status, 401, 'proxy requires session for query');
+  check((await post('/api/local/upload', 'not-an-image')).status, 401, 'proxy requires session for upload');
+  check((await fetch(base + '/api/local/file?bucket=order-photos&path=x&expires=0&signature=x')).status, 403, 'signed file rejects invalid signature');
+  check((await fetch(base + '/api/orders/not-an-order/route')).status, 401, 'anonymous route request rejected');
+  check((await fetch(base + '/api/orders/not-an-order/tracking', { method: 'POST', headers: { 'content-type': 'application/json', origin: base }, body: '{}' })).status, 401, 'anonymous GPS upload rejected');
+  check((await fetch(base + '/api/orders/not-an-order/tracking', { method: 'PATCH', headers: { 'content-type': 'application/json', origin: base }, body: '{}' })).status, 401, 'anonymous address update rejected');
   const loginPage = await fetch(base + '/login'); const html = await loginPage.text();
   const csp = loginPage.headers.get('content-security-policy');
   assert.ok(csp?.includes("object-src 'none'") && !csp.includes("script-src 'self' 'unsafe-inline'")); checks++;
@@ -55,6 +67,13 @@ try {
   check((await post('/api/local/api', { action: 'createUser', user: {} })).status, 400, 'proxy cannot create privileged users');
   check((await post('/api/local/api', { action: 'query', plan: { table: 'profiles' } })).status, 401, 'anonymous private query');
   for (const path of ['/admin', '/users', '/orders', '/company', '/profile', '/cleaner/my-work']) check((await fetch(base + path, { redirect: 'manual' })).status, 307, `anonymous ${path}`);
+  for (const path of ['/companies', '/communities']) {
+    const response = await fetch(base + path, { redirect: 'manual' });
+    check(new URL(response.headers.get('location')).pathname, '/admin/login', `anonymous ${path} uses admin login`);
+  }
+  const anonymousTracking = await fetch(base + '/api/company/tracking', { redirect: 'manual' });
+  check(anonymousTracking.status, 401, 'anonymous API returns unauthorized');
+  check(anonymousTracking.headers.get('content-type')?.startsWith('application/json'), true, 'anonymous API returns JSON');
   let adminCookie = '';
   for (const [role, paths] of [
     ['admin', ['/admin', '/admin/reports', '/admin/reports?period=all', '/users', '/orders', '/companies', '/communities', '/services', '/settings', '/moderation', '/verifications', '/notifications']],
@@ -105,14 +124,18 @@ try {
   assert.ok(proxyData.data.session.user && !proxyData.data.session.access_token); checks++;
   check((await post('/api/register', { email: 'evil@web.test', phone: '+77016660005', password, full_name: 'Evil', role: 'admin' })).status, 400, 'public admin registration denied');
   check((await post('/api/register', { email: 'new@web.test', phone: '+77016660006', password, full_name: 'New client', role: 'client', referral_code: '' })).status, 201, 'client registration');
+  check((await post('/api/register', { email: 'new@web.test', phone: '+77016660006', password, full_name: 'New client', role: 'client', referral_code: '' })).status, 409, 'duplicate registration rejected');
   check((await post('/api/register', { email: 'newowner@web.test', phone: '+77016660007', password, full_name: 'New owner', role: 'company_owner', referral_code: '   ', company_name: 'New company', company_registration_number: '223456789012', company_city: 'Актау', company_address: 'Дом 2', company_phone: '+77016660007' })).status, 201, 'company registration');
   check((await post('/api/register', { email: 'newcleaner@web.test', phone: '+77016660008', password, full_name: 'New cleaner', role: 'cleaner', referral_code: community.code })).status, 201, 'cleaner registration');
-  // Without a trusted proxy every visitor shares one rate-limit key: different
-  // people must still be able to register and recover passwords.
-  for (let i = 0; i < 8; i++) check((await post('/api/register', { email: `crowd${i}@web.test`, phone: `+7701667000${i}`, password, full_name: `Crowd ${i}`, role: 'client' })).status, 201, `registration #${i + 1} by a different person`);
+  // A trusted proxy provides separate real IPs: one busy visitor must not
+  // prevent unrelated people from registering or recovering their accounts.
+  for (let i = 0; i < 8; i++) check((await post('/api/register', { email: `crowd${i}@web.test`, phone: `+7701667000${i}`, password, full_name: `Crowd ${i}`, role: 'client' }, '', { 'x-real-ip': `198.51.100.${i + 1}` })).status, 201, `registration #${i + 1} by a different person`);
   for (let i = 0; i < 8; i++) check((await post('/api/local/api', { action: 'recover', email: `crowd${i}@web.test`, redirectTo: `${base}/reset-password` })).status, 200, `password recovery #${i + 1} by a different person`);
   for (let i = 0; i < 5; i++) await post('/api/local/api', { action: 'recover', email: 'same@web.test', redirectTo: `${base}/reset-password` });
   check((await post('/api/local/api', { action: 'recover', email: 'same@web.test', redirectTo: `${base}/reset-password` })).status, 429, 'password recovery still limited per account');
+  const realIp = '198.51.100.42';
+  for (let i = 0; i < 5; i++) check((await post('/api/register', { email: `spoof${i}@web.test`, role: 'client' }, '', { 'x-real-ip': realIp, 'x-forwarded-for': `203.0.113.${i + 1}` })).status, 400, 'registration validation before IP limit');
+  check((await post('/api/register', { email: 'spoof@web.test', role: 'client' }, '', { 'x-real-ip': realIp, 'x-forwarded-for': '203.0.113.200' })).status, 429, 'forged forwarded IP cannot bypass registration limit');
   const logout = await post('/api/local/api', { action: 'signOut' }, adminCookie); check(logout.status, 200, 'logout');
   check((await post('/api/local/api', { action: 'getUser' }, adminCookie).then(r => r.json())).data.user, null, 'logout invalidates server session');
   check((await fetch(base + '/.env.local', { redirect: 'manual' })).status === 200, false, 'environment file inaccessible');

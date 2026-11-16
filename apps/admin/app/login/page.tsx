@@ -109,7 +109,7 @@ export default function Login() {
             <Icon name="arrow" width="18" height="18" />
           </button>}
         </form>
-        {recovery && <div className="mt-4"><button type="button" className="button w-full" disabled={loading || recoverySent} onClick={() => void sendRecovery()}>{loading ? 'Отправляем…' : 'Отправить ссылку для восстановления'}</button>{recoverySent && <p role="status" className="mt-3 text-sm text-emerald-700">Если аккаунт найден, письмо отправлено. Проверьте почту.</p>}</div>}
+        {recovery && <div className="mt-4"><button type="button" className="button w-full" disabled={loading || recoverySent} onClick={() => void sendRecovery()}>{loading ? 'Обрабатываем…' : 'Запросить восстановление'}</button>{recoverySent && <p role="status" className="mt-3 text-sm text-amber-800">Запрос принят. Автоматическая отправка писем пока не подключена. Для получения ссылки обратитесь к администратору сервиса.</p>}</div>}
         <button type="button" className="mt-4 text-sm font-bold text-emerald-700" onClick={() => { setRecovery(!recovery); setError(''); setRecoverySent(false); }}>{recovery ? 'Вернуться ко входу' : 'Забыли пароль?'}</button>
         <div className="auth-switch">
           <p>Впервые в Cleaning Go?</p>

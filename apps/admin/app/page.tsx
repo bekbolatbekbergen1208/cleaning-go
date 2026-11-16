@@ -3,6 +3,7 @@ import { Icon } from '../components/icon';
 import { HomeMotion } from './home-motion';
 import { redirect } from 'next/navigation';
 import { createClient } from '../lib/backend/server';
+import { createClient as createBackendClient } from '@cleaning-go/local-client';
 
 const services = [
   {
@@ -50,22 +51,34 @@ const advantages = [
 ];
 
 export default async function PublicHome() {
-  {
-    const backend = await createClient();
-    const {
-      data: { user },
-    } = await backend.auth.getUser();
+  const backend = await createClient();
+  const {
+    data: { user },
+  } = await backend.auth.getUser();
 
-    if (user) {
-      const { data: profile } = await backend
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .maybeSingle();
+  if (user) {
+    const { data: profile } = await backend
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
 
-      if (profile?.role === 'company_owner') redirect('/company');
-    }
+    if (profile?.role === 'company_owner') redirect('/company');
   }
+  // Guests cannot read company profiles under RLS. Only expose the aggregate
+  // availability flag, never the privileged client or any company details.
+  const catalog = createBackendClient(
+    process.env.LOCAL_API_URL || 'http://127.0.0.1:54321',
+    process.env.LOCAL_SERVICE_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+  const { data: approvedCompanies, error: availabilityError } = await catalog
+    .from('company_profiles')
+    .select('id')
+    .eq('verification_status', 'approved')
+    .limit(1);
+  if (availabilityError) throw new Error('Не удалось проверить доступность заказов');
+  const bookingAvailable = Boolean(approvedCompanies?.length);
 
   return (
     <div className="public-home">
@@ -81,6 +94,12 @@ export default async function PublicHome() {
             Выберите подходящую уборку, удобное время и проверенного
             исполнителя. Всё остальное мы возьмём на себя.
           </p>
+          {!bookingAvailable && (
+            <p role="status" className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+              Заказы пока недоступны: сервис ждёт подключения проверенных компаний.
+              Зарегистрироваться можно уже сейчас.
+            </p>
+          )}
           <div className="home-actions">
             <Link href="/order/new" className="landing-primary">
               Заказать уборку <span>→</span>

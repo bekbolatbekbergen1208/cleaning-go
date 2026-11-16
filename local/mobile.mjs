@@ -84,7 +84,7 @@ console.log(
 if (!process.argv.includes('--prepare')) {
   const children = [];
   function run(args) {
-    const child = spawn('corepack', ['pnpm', ...args], {
+    const child = spawn('pnpm', args, {
       cwd: root,
       stdio: 'inherit',
       env: {

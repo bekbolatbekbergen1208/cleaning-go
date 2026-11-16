@@ -79,7 +79,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (loading || error || demoMode) return;
     const inAuth = segments[0] === '(auth)';
-    const recovery = segments[0] === 'reset-password';
+    const recovery = segments.join('/') === 'reset-password';
     if (!session && !inAuth && !recovery) router.replace('/(auth)/welcome');
     if (session && inAuth) router.replace('/(tabs)');
   }, [session, loading, error, segments, router]);

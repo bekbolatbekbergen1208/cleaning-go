@@ -8,7 +8,7 @@ Wi-Fi арқылы қосылады. Компьютер мен телефон б
 Жоба түбірінен:
 
 ```bash
-corepack pnpm mobile:local
+pnpm mobile:local
 ```
 
 Команда компьютердің LAN IP-мекенжайын анықтайды, API, веб және Expo-ны іске қосады.
@@ -68,7 +68,7 @@ EAS жобасын Expo аккаунтымен байланыстыру және
 Жергілікті native build үшін JDK 17, Android SDK орнатып:
 
 ```bash
-corepack pnpm --filter @cleaning-go/mobile android
+pnpm --filter @cleaning-go/mobile android
 ```
 
 Production жинағы `APP_VARIANT=production` кезінде HTTPS API талап етеді.
@@ -78,10 +78,10 @@ Production жинағы `APP_VARIANT=production` кезінде HTTPS API тал
 ## Қайта тексеру
 
 ```bash
-corepack pnpm typecheck
-corepack pnpm lint
-corepack pnpm test
-corepack pnpm --filter @cleaning-go/mobile exec expo install --check
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm --filter @cleaning-go/mobile exec expo install --check
 node --env-file=.env.local local/check-mobile.mjs
 ```
 

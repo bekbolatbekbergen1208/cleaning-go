@@ -78,19 +78,17 @@ export function createClient(
         () => controller.abort(),
         options.requestTimeoutMs || 15000,
       );
-      let response;
       try {
-        response = await fetch(`${url}/api`, {
+        const response = await fetch(`${url}/api`, {
           method: 'POST',
           headers,
           body: JSON.stringify(body),
           signal: controller.signal,
         });
+        return await response.json();
       } finally {
         clearTimeout(timeout);
       }
-      const result = await response.json();
-      return result;
     } catch (error) {
       return {
         data: null,
@@ -255,6 +253,11 @@ export function createClient(
     storage: {
       from: (bucket) => ({
         async upload(path, file, opts = {}) {
+          const controller = new AbortController();
+          const timeout = setTimeout(
+            () => controller.abort(),
+            options.uploadTimeoutMs || 60000,
+          );
           try {
             const t = await token();
             const response = await fetch(`${url}/upload`, {
@@ -268,10 +271,13 @@ export function createClient(
                   opts.contentType || file.type || 'application/octet-stream',
               },
               body: file,
+              signal: controller.signal,
             });
             return await response.json();
           } catch (error) {
-            return { data: null, error: { message: error.message } };
+            return { data: null, error: { message: error.name === 'AbortError' ? 'Загрузка заняла слишком много времени. Проверьте подключение.' : error.message } };
+          } finally {
+            clearTimeout(timeout);
           }
         },
         async createSignedUrls(paths, expires) {

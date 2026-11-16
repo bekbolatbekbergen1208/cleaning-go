@@ -14,7 +14,7 @@ import type { Order } from '@cleaning-go/types';
 import { orderDraftSchema } from '@cleaning-go/validation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Alert, Image, Pressable, Text, View } from 'react-native';
 import { z } from 'zod';
@@ -73,6 +73,7 @@ export default function CreateOrder() {
   const [city, setCity] = useState('Актау');
   const [address, setAddress] = useState('');
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const [photo, setPhoto] = useState<RoomPhoto | null>(null);
   const [scheduledDate, setScheduledDate] = useState(() =>
     dateInputValue(new Date(Date.now() + 86400000)),
@@ -184,6 +185,7 @@ export default function CreateOrder() {
   }
 
   async function submit(values: Form) {
+    if (submitting.current) return;
     if (!company && !selectedCleaner) return router.push('/select-company');
     if (!photo)
       return Alert.alert(
@@ -196,7 +198,9 @@ export default function CreateOrder() {
     if (
       !/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate) ||
       !/^\d{2}:\d{2}$/.test(scheduledTime) ||
-      Number.isNaN(scheduled.getTime())
+      Number.isNaN(scheduled.getTime()) ||
+      dateInputValue(scheduled) !== scheduledDate ||
+      `${String(scheduled.getHours()).padStart(2, '0')}:${String(scheduled.getMinutes()).padStart(2, '0')}` !== scheduledTime
     ) {
       return Alert.alert(
         'Проверьте дату и время',
@@ -209,6 +213,7 @@ export default function CreateOrder() {
         'Дата и время уборки должны быть позже текущего момента.',
       );
     const scheduledAt = scheduled.toISOString();
+    submitting.current = true;
     setBusy(true);
     try {
       if (demo) {
@@ -313,6 +318,7 @@ export default function CreateOrder() {
           : 'Проверьте подключение и повторите попытку.',
       );
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }
@@ -524,10 +530,10 @@ export default function CreateOrder() {
               : 'Выбрать исполнителя'
         }
         busy={busy}
-        disabled={companyLoading}
+        disabled={companyLoading || busy}
         onPress={
           company || selectedCleaner
-            ? handleSubmit(submit)
+            ? handleSubmit(submit, (invalid) => Alert.alert('Проверьте данные заказа', Object.values(invalid)[0]?.message || 'Заполните обязательные поля.'))
             : () => router.push('/select-company')
         }
       />

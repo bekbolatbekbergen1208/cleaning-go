@@ -6,10 +6,10 @@
 
 ## Запуск
 
-Требуется Node.js 22+ и Corepack (pnpm 10.14.0).
+Требуется Node.js 22+ и pnpm 10.14.0 (версия закреплена в packageManager).
 
 ```bash
-corepack pnpm install
+pnpm install
 node local/setup.mjs
 node --env-file=.env.local local/create-admin.mjs
 ```
@@ -27,7 +27,7 @@ node --env-file=.env.local local/server.mjs
 ```
 
 ```bash
-corepack pnpm --filter @cleaning-go/admin dev
+pnpm --filter @cleaning-go/admin dev
 ```
 
 Сайт: http://localhost:3000. Администратор: http://localhost:3000/admin/login.
@@ -36,7 +36,7 @@ corepack pnpm --filter @cleaning-go/admin dev
 Мобильное приложение:
 
 ```bash
-corepack pnpm --filter @cleaning-go/mobile start
+pnpm --filter @cleaning-go/mobile start
 ```
 
 Для физического телефона укажите IP компьютера вместо `127.0.0.1` в
@@ -63,10 +63,10 @@ corepack pnpm --filter @cleaning-go/mobile start
 ## Проверки
 
 ```bash
-corepack pnpm -r typecheck
-corepack pnpm -r --if-present lint
+pnpm -r typecheck
+pnpm -r --if-present lint
 node --test local/tests/*.test.mjs scripts/tests/*.test.mjs
-corepack pnpm --filter @cleaning-go/admin build
+pnpm --filter @cleaning-go/admin build
 ```
 
 Проверяется применение всей схемы к пустой базе, запросы приложений, регистрация
@@ -95,7 +95,7 @@ iOS/Android требует отдельной проверки разрешен�
 Телефонмен бір Wi-Fi желісінде API, веб және Expo іске қосу:
 
 ```bash
-corepack pnpm mobile:local
+pnpm mobile:local
 ```
 
 [Android нұсқаулығы](docs/ANDROID.md) · [Кеңейтілген тексеру есебі](docs/FUNCTIONAL_AUDIT.md).
@@ -114,8 +114,8 @@ corepack pnpm mobile:local
 Проверка веб-ролей и защиты на отдельной временной базе после сборки:
 
 ```bash
-corepack pnpm --filter @cleaning-go/admin build
-corepack pnpm test:web
+pnpm --filter @cleaning-go/admin build
+pnpm test:web
 ```
 
 [Отчёт по безопасности и границы проверки](docs/SECURITY_AUDIT_2026-11-11.md).
@@ -128,7 +128,7 @@ corepack pnpm test:web
 Толық пайдаланушы сценарийін бөлек уақытша базада тексеру (алдымен вебті build жасаңыз):
 
 ```bash
-corepack pnpm test:functional
+pnpm test:functional
 ```
 
 [Аккаунттар мен тапсырыстарды тексеру нәтижесі](docs/FUNCTIONAL_CHECK_2026-11-11.md).
