@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from '@cleaning-go/local-client';
 import { NextResponse, type NextRequest } from 'next/server';
 import { bodyIsTooLarge, clientIp, hasJsonContentType, isRateLimited, isSameOriginRequest, readJsonBody, sessionCookieOptions } from '../../../../lib/request-security';
+import { isAllowedAdmin } from '../../../../lib/admin-access';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
 
   const { data: profile } = await backend
     .from('profiles')
-    .select('role')
+    .select('role,status')
     .eq('id', data.user.id)
     .maybeSingle();
 
@@ -69,6 +70,14 @@ export async function POST(request: NextRequest) {
     await backend.auth.signOut({ scope: 'local' });
     return applyAuthCookies(NextResponse.json(
       { error: 'Профиль аккаунта не найден. Обратитесь в поддержку.' },
+      { status: 403 },
+    ));
+  }
+
+  if (profile.role === 'admin' && !isAllowedAdmin(data.user, profile)) {
+    await backend.auth.signOut({ scope: 'local' });
+    return applyAuthCookies(NextResponse.json(
+      { error: 'У этого аккаунта нет доступа администратора.' },
       { status: 403 },
     ));
   }

@@ -1,7 +1,5 @@
 'use client';
 
-import { createClient } from '../../../lib/backend/client';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 export default function AdminLogin() {
@@ -9,25 +7,28 @@ export default function AdminLogin() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError('');
     setLoading(true);
-    const backend = createClient();
-    const { data, error: loginError } = await backend.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
-    if (loginError || !data.user) { setError('Неверный email или пароль'); setLoading(false); return; }
-
-    const { data: profile } = await backend.from('profiles').select('role').eq('id', data.user.id).single();
-    if (profile?.role !== 'admin') {
-      await backend.auth.signOut();
-      setError('У этого аккаунта нет доступа администратора.');
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+      });
+      const result = (await response.json().catch(() => null)) as { destination?: string; error?: string } | null;
+      if (!response.ok || !result?.destination) {
+        setError(result?.error ?? 'Не удалось войти.');
+        setLoading(false);
+        return;
+      }
+      window.location.assign(result.destination);
+    } catch {
+      setError('Нет соединения. Попробуйте ещё раз.');
       setLoading(false);
-      return;
     }
-    router.replace('/admin');
-    router.refresh();
   }
 
   return <div className="mx-auto mt-20 max-w-md card">

@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from './backend/server';
+import { isAllowedAdmin } from './admin-access';
 
 export async function requireAdmin() {
   const backend = await createClient();
@@ -7,10 +8,9 @@ export async function requireAdmin() {
 
   if (!user) redirect('/admin/login');
 
-  const ownerEmail = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
-  const { data } = await backend.from('profiles').select('role').eq('id', user.id).single();
+  const { data } = await backend.from('profiles').select('role,status').eq('id', user.id).single();
 
-  if (!ownerEmail || user.email?.toLowerCase() !== ownerEmail || data?.role !== 'admin') {
+  if (!isAllowedAdmin(user, data)) {
     await backend.auth.signOut();
     redirect('/?error=forbidden');
   }

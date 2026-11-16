@@ -30,9 +30,13 @@ try {
     if (role === 'cleaner') ok(await admin.from('cleaner_profiles').update({ verification_status: 'approved', is_available: true, workday_ends_at: new Date(Date.now()+3600000).toISOString() }).eq('user_id', user.id));
     if (email === 'admin@web.test') ok(await admin.from('profiles').update({ role: 'admin' }).eq('id', user.id));
   }
+  for (const email of ['additional@web.test', 'unlisted@web.test']) {
+    const user = ok(await admin.auth.admin.createUser({ email, password, user_metadata: { role: 'client', full_name: 'Web QA' } })).user;
+    ok(await admin.from('profiles').update({ role: 'admin' }).eq('id', user.id));
+  }
   child = spawn(process.execPath, [require.resolve('next/dist/bin/next'), 'start', '--hostname', '127.0.0.1', '--port', '3107'], {
     cwd: fileURLToPath(new URL('../apps/admin/', import.meta.url)),
-    env: { ...process.env, NODE_ENV: 'production', LOCAL_API_URL: `http://127.0.0.1:${app.port}`, LOCAL_SERVICE_KEY: key, PUBLIC_APP_URL: base, SEED_ADMIN_EMAIL: 'admin@web.test', TRUST_PROXY_HEADERS: 'true' }, stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, NODE_ENV: 'production', LOCAL_API_URL: `http://127.0.0.1:${app.port}`, LOCAL_SERVICE_KEY: key, PUBLIC_APP_URL: base, SEED_ADMIN_EMAIL: 'admin@web.test', ADDITIONAL_ADMIN_EMAILS: ' additional@web.test ', TRUST_PROXY_HEADERS: 'true' }, stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logs = ''; child.stdout.on('data', x => { logs += x; }); child.stderr.on('data', x => { logs += x; });
   for (let n = 0; n < 100; n++) {
@@ -119,6 +123,14 @@ try {
     }
     if (role !== 'admin') check((await fetch(base + '/admin', { headers: { cookie: auth }, redirect: 'manual' })).status, 307, `${role} denied admin`);
   }
+  const additionalLogin = await post('/api/auth/login', { email: 'additional@web.test', password });
+  check(additionalLogin.status, 200, 'allowed second admin login');
+  check((await additionalLogin.json()).destination, '/admin', 'second admin destination');
+  const additionalCookie = additionalLogin.headers.getSetCookie().find(value => value.startsWith('cleaning-go-session='))?.split(';')[0];
+  assert.ok(additionalCookie, 'second admin session cookie'); checks++;
+  for (let i = 0; i < 2; i++) check((await fetch(base + '/admin', { headers: { cookie: additionalCookie }, redirect: 'manual' })).status, 200, 'second admin session persists');
+  check((await fetch(base + '/api/reports/orders?scope=admin&period=all', { headers: { cookie: additionalCookie } })).status, 200, 'second admin CSV');
+  check((await post('/api/auth/login', { email: 'unlisted@web.test', password })).status, 403, 'unlisted admin denied');
   const proxyLogin = await post('/api/local/api', { action: 'signIn', email: 'admin@web.test', password });
   check(proxyLogin.status, 200, 'browser admin login through proxy'); const proxyData = await proxyLogin.json();
   assert.ok(proxyData.data.session.user && !proxyData.data.session.access_token); checks++;

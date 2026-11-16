@@ -3,6 +3,7 @@ import { createClient } from '../../../../lib/backend/server';
 import { loadReportOrders, serviceClient, serviceNames } from '../../../../lib/report-data';
 import { orderStatusNames } from '../../../../lib/labels';
 import { REPORT_TZ, parsePeriod, toCsv } from '../../../../lib/reports';
+import { isAllowedAdmin } from '../../../../lib/admin-access';
 
 const when = new Intl.DateTimeFormat('ru-RU', { timeZone: REPORT_TZ, dateStyle: 'short', timeStyle: 'short' });
 const tenge = (minor: number) => Math.round(minor) / 100;
@@ -18,9 +19,7 @@ export async function GET(request: NextRequest) {
 
   let companyId: string | undefined;
   if (scope === 'admin') {
-    // Same rule as requireAdmin(): the admin role and the configured owner e-mail.
-    const owner = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
-    if (profile.role !== 'admin' || !owner || user.email?.toLowerCase() !== owner) return NextResponse.json({ error: 'Доступ запрещён' }, { status: 403 });
+    if (!isAllowedAdmin(user, profile)) return NextResponse.json({ error: 'Доступ запрещён' }, { status: 403 });
   } else if (scope === 'company') {
     const { data: company } = await db.from('company_profiles').select('id').eq('owner_id', user.id).maybeSingle();
     if (profile.role !== 'company_owner' || !company) return NextResponse.json({ error: 'Доступ запрещён' }, { status: 403 });
